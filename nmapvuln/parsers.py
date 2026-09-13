@@ -133,6 +133,10 @@ def parse_xml(path: str) -> list[ScanRun]:
     run.nmap_version = root.get("version", "")
     run.args = root.get("args", "")
     run.start = root.get("startstr", "") or root.get("start", "")
+    try:
+        run.start_epoch = int(root.get("start") or 0) or None
+    except (TypeError, ValueError):
+        run.start_epoch = None
 
     finished = root.find("runstats/finished")
     if finished is not None:

@@ -35,73 +35,86 @@ from .sources import NVDClient, VulnersClient, finding_from_nvd
 # services that actually show up in an external scan; anything unmapped falls
 # through to a keyword search.
 PRODUCT_CPE = {
-    "openssh": "openbsd:openssh",
-    "apache httpd": "apache:http_server",
-    "apache tomcat": "apache:tomcat",
-    "apache tomcat/coyote jsp engine": "apache:tomcat",
-    "nginx": "nginx:nginx",
-    "microsoft iis httpd": "microsoft:internet_information_services",
-    "lighttpd": "lighttpd:lighttpd",
-    "jetty": "eclipse:jetty",
-    "mysql": "oracle:mysql",
-    "mariadb": "mariadb:mariadb",
-    "postgresql db": "postgresql:postgresql",
-    "postgresql": "postgresql:postgresql",
-    "microsoft sql server": "microsoft:sql_server",
-    "mongodb": "mongodb:mongodb",
-    "redis key-value store": "redis:redis",
-    "redis": "redis:redis",
-    "memcached": "memcached:memcached",
-    "elasticsearch": "elastic:elasticsearch",
-    "vsftpd": "beasts:vsftpd",
-    "proftpd": "proftpd:proftpd",
-    "pure-ftpd": "pureftpd:pure-ftpd",
-    "filezilla ftpd": "filezilla-project:filezilla_server",
-    "exim smtpd": "exim:exim",
-    "postfix smtpd": "postfix:postfix",
-    "sendmail": "sendmail:sendmail",
-    "dovecot imapd": "dovecot:dovecot",
-    "dovecot pop3d": "dovecot:dovecot",
-    "samba smbd": "samba:samba",
-    "isc bind": "isc:bind",
-    "bind": "isc:bind",
-    "dnsmasq": "thekelleys:dnsmasq",
-    "openssl": "openssl:openssl",
-    "php": "php:php",
-    "php cgi": "php:php",
-    "python": "python:python",
-    "node.js": "nodejs:node.js",
-    "node.js express framework": "openjsf:express",
-    "dropbear sshd": "dropbear_ssh_project:dropbear_ssh",
-    "openvpn": "openvpn:openvpn",
-    "squid http proxy": "squid-cache:squid",
-    "haproxy": "haproxy:haproxy",
-    "varnish": "varnish-cache:varnish_cache",
-    "jenkins": "jenkins:jenkins",
-    "gitlab": "gitlab:gitlab",
-    "grafana": "grafana:grafana",
-    "wordpress": "wordpress:wordpress",
-    "drupal": "drupal:drupal",
-    "joomla": "joomla:joomla",
-    "rabbitmq": "pivotal_software:rabbitmq",
-    "docker": "docker:docker",
-    "kubernetes": "kubernetes:kubernetes",
-    "vmware esxi": "vmware:esxi",
-    "vmware authentication daemon": "vmware:workstation",
-    "microsoft windows rpc": "microsoft:windows",
-    "microsoft terminal services": "microsoft:remote_desktop_services",
-    "microsoft ftpd": "microsoft:internet_information_services",
-    "microsoft exchange": "microsoft:exchange_server",
-    "webmin": "webmin:webmin",
-    "cups": "apple:cups",
-    "ntpd": "ntp:ntp",
-    "snmpd": "net-snmp:net-snmp",
-    "net-snmp": "net-snmp:net-snmp",
-    "tightvnc": "tightvnc:tightvnc",
-    "realvnc": "realvnc:vnc",
-    "gnu inetutils ftpd": "gnu:inetutils",
-    "openresty": "openresty:openresty",
+    "openssh": "a:openbsd:openssh",
+    "apache httpd": "a:apache:http_server",
+    "apache tomcat": "a:apache:tomcat",
+    "apache tomcat/coyote jsp engine": "a:apache:tomcat",
+    "nginx": "a:nginx:nginx",
+    "microsoft iis httpd": "a:microsoft:internet_information_services",
+    "lighttpd": "a:lighttpd:lighttpd",
+    "jetty": "a:eclipse:jetty",
+    "mysql": "a:oracle:mysql",
+    "mariadb": "a:mariadb:mariadb",
+    "postgresql db": "a:postgresql:postgresql",
+    "postgresql": "a:postgresql:postgresql",
+    "microsoft sql server": "a:microsoft:sql_server",
+    "mongodb": "a:mongodb:mongodb",
+    "redis key-value store": "a:redis:redis",
+    "redis": "a:redis:redis",
+    "memcached": "a:memcached:memcached",
+    "elasticsearch": "a:elastic:elasticsearch",
+    "vsftpd": "a:beasts:vsftpd",
+    "proftpd": "a:proftpd:proftpd",
+    "pure-ftpd": "a:pureftpd:pure-ftpd",
+    "filezilla ftpd": "a:filezilla-project:filezilla_server",
+    "exim smtpd": "a:exim:exim",
+    "postfix smtpd": "a:postfix:postfix",
+    "sendmail": "a:sendmail:sendmail",
+    "dovecot imapd": "a:dovecot:dovecot",
+    "dovecot pop3d": "a:dovecot:dovecot",
+    "samba smbd": "a:samba:samba",
+    "isc bind": "a:isc:bind",
+    "bind": "a:isc:bind",
+    "dnsmasq": "a:thekelleys:dnsmasq",
+    "openssl": "a:openssl:openssl",
+    "php": "a:php:php",
+    "php cgi": "a:php:php",
+    "python": "a:python:python",
+    "node.js": "a:nodejs:node.js",
+    "node.js express framework": "a:openjsf:express",
+    "dropbear sshd": "a:dropbear_ssh_project:dropbear_ssh",
+    "openvpn": "a:openvpn:openvpn",
+    "squid http proxy": "a:squid-cache:squid",
+    "haproxy": "a:haproxy:haproxy",
+    "varnish": "a:varnish-cache:varnish_cache",
+    "jenkins": "a:jenkins:jenkins",
+    "gitlab": "a:gitlab:gitlab",
+    "grafana": "a:grafana:grafana",
+    "wordpress": "a:wordpress:wordpress",
+    "drupal": "a:drupal:drupal",
+    "joomla": "a:joomla:joomla",
+    "rabbitmq": "a:pivotal_software:rabbitmq",
+    "docker": "a:docker:docker",
+    "kubernetes": "a:kubernetes:kubernetes",
+    "vmware esxi": "o:vmware:esxi",
+    "vmware authentication daemon": "a:vmware:workstation",
+    "microsoft windows rpc": "o:microsoft:windows",
+    "microsoft terminal services": "a:microsoft:remote_desktop_services",
+    "microsoft ftpd": "a:microsoft:internet_information_services",
+    "microsoft exchange": "a:microsoft:exchange_server",
+    "webmin": "a:webmin:webmin",
+    "cups": "a:apple:cups",
+    "ntpd": "a:ntp:ntp",
+    "snmpd": "a:net-snmp:net-snmp",
+    "net-snmp": "a:net-snmp:net-snmp",
+    "tightvnc": "a:tightvnc:tightvnc",
+    "realvnc": "a:realvnc:vnc",
+    "gnu inetutils ftpd": "a:gnu:inetutils",
+    "openresty": "a:openresty:openresty",
 }
+
+# Distribution packaging markers, in the version string or in nmap's extrainfo.
+# A Debian "OpenSSH 7.4" carries fixes for most of what NVD lists against
+# upstream 7.4 without changing the advertised version, so a version match
+# against one of these is a lead at best and usually a false positive. This is
+# the single largest source of bogus CVE rows against Linux targets.
+# The separator may be followed by a Debian revision number, as in
+# "1.1.1f-1ubuntu2.16", so a digit run is allowed before the distribution name.
+_BACKPORT_RE = re.compile(
+    r"(?:^|[-+~. ])\d*(?:ubuntu|debian|deb\d|raspbian|centos|rhel|el\d+|fc\d+"
+    r"|almalinux|rocky|amzn|suse|sles|dfsg)",
+    re.I,
+)
 
 _VERSION_RE = re.compile(r"^[0-9][0-9A-Za-z._\-]*$")
 # Trailing distro packaging noise: "1.2.3-1ubuntu2.4", "2.4.6 (Ubuntu)"
@@ -153,13 +166,57 @@ def _clean_version(version: str) -> str:
     return version if _VERSION_RE.match(version) else ""
 
 
+def looks_backported(service) -> bool:
+    """True when the banner names a distribution build rather than an upstream one."""
+    haystack = " ".join(
+        bit for bit in (service.version, service.extrainfo, service.ostype) if bit
+    )
+    return bool(_BACKPORT_RE.search(haystack))
+
+
+def cve_matches_product(cve: dict, cpe23: str) -> bool:
+    """Check locally that a returned CVE really applies to the product asked about.
+
+    NVD does the version-range matching server side, but a keyword or loose
+    CPE query can still return records for a different product entirely. This
+    re-reads the CVE's own applicability configuration and keeps it only when
+    the vendor and product line up.
+    """
+    parts = cpe23.split(":")
+    if len(parts) < 5:
+        return True
+    want = f"{parts[3]}:{parts[4]}".lower()
+    if "*" in want:
+        return True
+
+    configurations = cve.get("configurations") or []
+    saw_any = False
+    for config in configurations:
+        for node in config.get("nodes") or []:
+            for entry in node.get("cpeMatch") or []:
+                criteria = (entry.get("criteria") or "").lower().split(":")
+                if len(criteria) > 4:
+                    saw_any = True
+                    if f"{criteria[3]}:{criteria[4]}" == want:
+                        return True
+    # A record with no applicability data at all (awaiting analysis) cannot be
+    # checked either way; keep it rather than inventing a verdict.
+    return not saw_any
+
+
 def _cpe_has_version(cpe23: str) -> bool:
     parts = cpe23.split(":")
     return len(parts) > 5 and parts[5] not in ("*", "-", "")
 
 
-def build_queries(port: Port) -> list[ServiceQuery]:
-    """Decide what to look up for one open port. Empty means 'not matchable'."""
+def build_queries(port: Port, allow_keyword: bool = False) -> list[ServiceQuery]:
+    """Decide what to look up for one open port. Empty means 'not matchable'.
+
+    Keyword search is off unless asked for. An NVD keyword query returns
+    everything whose text mentions the words, so an unmapped product name
+    produces dozens of unrelated CVEs per port — the noisiest thing this
+    tool can do, and it was previously on by default.
+    """
     svc = port.service
     if not svc:
         return []
@@ -202,20 +259,22 @@ def build_queries(port: Port) -> list[ServiceQuery]:
             # "Apache httpd 2.4.49" style strings sometimes carry the version.
             vendor_product = PRODUCT_CPE.get(re.sub(r"\s+[\d.]+$", "", key))
         if vendor_product and version:
-            cpe23 = f"cpe:2.3:a:{vendor_product}:{version}:*:*:*:*:*:*:*"
+            cpe23 = f"cpe:2.3:{vendor_product}:{version}:*:*:*:*:*:*:*"
             return [
                 ServiceQuery(
                     cpe23=cpe23, product=svc.product, version=version, confidence="medium"
                 )
             ]
         if vendor_product:
-            cpe23 = f"cpe:2.3:a:{vendor_product}:*:*:*:*:*:*:*:*"
+            cpe23 = f"cpe:2.3:{vendor_product}:*:*:*:*:*:*:*:*"
             return [
                 ServiceQuery(cpe23=cpe23, product=svc.product, version="", confidence="low")
             ]
 
-        # 3. Unknown product: keyword search. Skip products that are really just a
-        # version blob ("2-4 (RPC #100000)") — those produce pure noise.
+        # 3. Unknown product: keyword search, only on request. Skip products
+        # that are really just a version blob ("2-4 (RPC #100000)") outright.
+        if not allow_keyword:
+            return []
         if not re.search(r"[A-Za-z]{3}", svc.product):
             return []
         keyword = f"{svc.product} {version}".strip()
@@ -239,13 +298,23 @@ class Matcher:
         include_unversioned: bool = False,
         min_cvss: float = 0.0,
         verbose: bool = False,
+        include_backported: bool = False,
+        keyword_search: bool = False,
+        verify_cpe: bool = True,
     ):
         self.nvd = nvd
         self.vulners = vulners
         self.include_unversioned = include_unversioned
         self.min_cvss = min_cvss
         self.verbose = verbose
+        self.include_backported = include_backported
+        self.keyword_search = keyword_search
+        self.verify_cpe = verify_cpe
         self._cve_cache: dict[str, list[dict]] = {}
+        self._suppressed: dict[str, int] = {}
+
+    def _suppress(self, reason: str, count: int = 1) -> None:
+        self._suppressed[reason] = self._suppressed.get(reason, 0) + count
 
     # -- public ----------------------------------------------------------
 
@@ -257,11 +326,27 @@ class Matcher:
             for host in scan.hosts:
                 for port in host.open_ports:
                     findings.extend(self._nse_findings(scan, host, port))
-                    for query in build_queries(port):
+                    queries = build_queries(port, allow_keyword=self.keyword_search)
+                    if not queries and port.service.product:
+                        analysis.skipped_services.append(
+                            f"{host.label} {port.key} {port.service.banner} "
+                            f"(no CPE mapping - not looked up)"
+                        )
+                    for query in queries:
                         if query.confidence == "low" and not self.include_unversioned:
                             analysis.skipped_services.append(
                                 f"{host.label} {port.key} {port.service.banner} "
-                                f"(no version — use --include-unversioned)"
+                                f"(no version - use --include-unversioned)"
+                            )
+                            continue
+                        # A distribution build advertises the upstream version it
+                        # forked from, so matching it against upstream CVE ranges
+                        # reports fixes the vendor already shipped. Skipped before
+                        # the lookup so no rate-limited request is spent on it.
+                        if not self.include_backported and looks_backported(port.service):
+                            self._suppress(
+                                "services whose banner names a distribution build, where "
+                                "upstream CVE ranges do not apply (--include-backported)"
                             )
                             continue
                         targets.append((scan, host, port, query))
@@ -280,6 +365,8 @@ class Matcher:
         analysis.queried = len(unique)
         analysis.findings = self._dedupe(findings)
         analysis.findings.sort(key=lambda f: f.sort_key)
+        for reason, count in self._suppressed.items():
+            analysis.suppress(reason, count)
 
     # -- internals -------------------------------------------------------
 
@@ -291,11 +378,20 @@ class Matcher:
         if degraded and confidence == "high":
             confidence = "medium"
 
+        backported = looks_backported(port.service)
+
         for cve in self._nvd_records(query):
             (cve_id, score, vector, severity, published, description, refs) = finding_from_nvd(cve)
             if not cve_id:
                 continue
+            if self.verify_cpe and query.cpe23 and not cve_matches_product(cve, query.cpe23):
+                self._suppress(
+                    "CVE rows whose matched product is absent from the CVE's own "
+                    "applicability data (--no-verify-cpe)"
+                )
+                continue
             if self.min_cvss and (score or 0.0) < self.min_cvss:
+                self._suppress("CVE rows scoring below --min-cvss")
                 continue
             out.append(
                 Finding(
@@ -315,6 +411,7 @@ class Matcher:
                     confidence=confidence,
                     matched_on=query.label,
                     scan_file=scan.source,
+                    backport_suspected=backported,
                 )
             )
 
@@ -328,6 +425,7 @@ class Matcher:
                 if not cve_id:
                     continue
                 if self.min_cvss and (score or 0.0) < self.min_cvss:
+                    self._suppress("CVE rows scoring below --min-cvss")
                     continue
                 out.append(
                     Finding(
@@ -350,6 +448,7 @@ class Matcher:
                         matched_on=query.label,
                         exploit_known=exploit,
                         scan_file=scan.source,
+                        backport_suspected=backported,
                     )
                 )
         return out

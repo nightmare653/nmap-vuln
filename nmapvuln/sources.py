@@ -18,7 +18,7 @@ import urllib.request
 from typing import Any, Optional
 
 from .cache import Cache
-from .model import Finding, severity_from_score
+from .model import severity_from_score
 
 NVD_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 VULNERS_URL = "https://vulners.com/api/v3/burp/software/"
@@ -228,3 +228,116 @@ class VulnersClient:
             return []
         search = (cached.get("data") or {}).get("search") or []
         return [item.get("_source", {}) for item in search if item.get("_source")]
+
+
+# ---------------------------------------------------------------------------
+# Corroborating sources
+#
+# Neither of these creates findings. They qualify the ones a version match
+# already produced, which is what makes a long CVE list actionable: of forty
+# rows against an old Apache, the two in CISA's exploited catalogue are the
+# ones worth a phone call. Both are free and need no key.
+# ---------------------------------------------------------------------------
+
+KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+EPSS_URL = "https://api.first.org/data/v1/epss"
+
+
+class KevCatalog:
+    """CISA's Known Exploited Vulnerabilities catalogue.
+
+    One request for the whole catalogue, cached for the usual TTL. A CVE listed
+    here has been observed in real attacks, which is a far stronger signal than
+    any CVSS score.
+    """
+
+    def __init__(self, cache: Cache, verbose: bool = False):
+        self.cache = cache
+        self.verbose = verbose
+        self.errors: list[str] = []
+        self._entries: Optional[dict[str, str]] = None
+
+    def load(self) -> dict[str, str]:
+        """CVE id -> the remediation due date CISA published."""
+        if self._entries is not None:
+            return self._entries
+
+        payload = self.cache.get("kev:catalog")
+        if payload is None:
+            if self.verbose:
+                print("  [kev] fetching catalogue", file=sys.stderr)
+            try:
+                payload = _http(KEV_URL)
+            except HttpError as exc:
+                self.errors.append(f"CISA KEV fetch failed: {exc}")
+                self._entries = {}
+                return self._entries
+            self.cache.put("kev:catalog", payload)
+
+        entries = {}
+        for item in (payload or {}).get("vulnerabilities", []) or []:
+            cve_id = (item.get("cveID") or "").upper()
+            if cve_id:
+                entries[cve_id] = item.get("dueDate", "") or ""
+        self._entries = entries
+        return entries
+
+
+class EpssClient:
+    """FIRST.org EPSS — probability that a CVE is exploited in the next 30 days.
+
+    Queried in batches, because one request per CVE would be thousands of
+    requests on a large scan.
+    """
+
+    BATCH = 100
+
+    def __init__(self, cache: Cache, verbose: bool = False):
+        self.cache = cache
+        self.verbose = verbose
+        self.errors: list[str] = []
+        self.request_count = 0
+        self.limiter = RateLimiter(10, 10.0)
+
+    def scores(self, cve_ids: list[str]) -> dict[str, float]:
+        wanted = sorted({c.upper() for c in cve_ids if c.upper().startswith("CVE-")})
+        out: dict[str, float] = {}
+        pending: list[str] = []
+
+        for cve_id in wanted:
+            cached = self.cache.get(f"epss:{cve_id}")
+            if cached is None:
+                pending.append(cve_id)
+            elif isinstance(cached, (int, float)):
+                out[cve_id] = float(cached)
+
+        for start in range(0, len(pending), self.BATCH):
+            batch = pending[start : start + self.BATCH]
+            query = urllib.parse.urlencode({"cve": ",".join(batch)})
+            self.limiter.wait()
+            self.request_count += 1
+            if self.verbose:
+                print(f"  [epss] {len(batch)} CVE(s)", file=sys.stderr)
+            try:
+                payload = _http(f"{EPSS_URL}?{query}")
+            except HttpError as exc:
+                self.errors.append(f"EPSS query failed: {exc}")
+                continue
+
+            found = set()
+            for row in (payload or {}).get("data", []) or []:
+                cve_id = (row.get("cve") or "").upper()
+                try:
+                    score = float(row.get("epss"))
+                except (TypeError, ValueError):
+                    continue
+                out[cve_id] = score
+                found.add(cve_id)
+                self.cache.put(f"epss:{cve_id}", score)
+            # EPSS has no row for very new or rejected CVEs. Remember the
+            # absence too, so the next run does not ask again.
+            for cve_id in batch:
+                if cve_id not in found:
+                    self.cache.put(f"epss:{cve_id}", -1.0)
+
+        return {k: v for k, v in out.items() if v >= 0.0}

@@ -32,6 +32,10 @@ CSV_COLUMNS = [
     "cvss_vector",
     "confidence",
     "source",
+    "kev",
+    "kev_due",
+    "epss",
+    "backport_suspected",
     "exploit_known",
     "published",
     "matched_on",
@@ -60,6 +64,10 @@ def write_csv(analysis: Analysis, path: str) -> str:
                     f.cvss_vector,
                     f.confidence,
                     f.source,
+                    "yes" if f.kev else "no",
+                    f.kev_due,
+                    "" if f.epss is None else f"{f.epss:.5f}",
+                    "yes" if f.backport_suspected else "no",
                     "yes" if f.exploit_known else "no",
                     f.published,
                     f.matched_on,
@@ -77,6 +85,7 @@ WEAKNESS_COLUMNS = [
     "port",
     "service",
     "severity",
+    "confidence",
     "rule_id",
     "title",
     "category",
@@ -100,6 +109,7 @@ def write_weakness_csv(analysis: Analysis, path: str) -> str:
                     w.port,
                     w.service,
                     w.severity,
+                    w.confidence,
                     w.rule_id,
                     w.title,
                     w.category,
@@ -176,6 +186,7 @@ td.nowrap,th.nowrap{white-space:nowrap}
 .b-UNKNOWN{background:var(--unk-bg);color:var(--unk)}
 .tag{display:inline-block;padding:1px 7px;border-radius:5px;background:var(--chip);
   color:var(--muted);font-size:11.5px;white-space:nowrap}
+.tag.kev{background:var(--crit-bg);color:var(--crit);font-weight:600}
 .tag.exp{background:var(--crit-bg);color:var(--crit);font-weight:650}
 .desc{color:var(--muted);font-size:12.5px;max-width:520px}
 .controls{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
@@ -251,6 +262,15 @@ def _finding_row(f: Finding) -> str:
         else _esc(f.cve)
     )
     exploit = ' <span class="tag exp">exploit</span>' if f.exploit_known else ""
+    # CISA KEV is the strongest single signal in the row: the vulnerability has
+    # been seen used against real targets, which no CVSS score tells you.
+    if f.kev:
+        due = f" (fix by {_esc(f.kev_due)})" if f.kev_due else ""
+        exploit = f' <span class="tag kev">KEV{due}</span>' + exploit
+    if f.epss is not None:
+        exploit += f' <span class="tag">EPSS {f.epss * 100:.1f}%</span>'
+    if f.backport_suspected:
+        exploit += ' <span class="tag">backport?</span>'
     desc = " ".join((f.description or "").split())
     if len(desc) > 300:
         desc = desc[:300].rsplit(" ", 1)[0] + "…"
@@ -281,6 +301,7 @@ def _weakness_rows(analysis: Analysis) -> str:
             f'<td class="nowrap">{_esc(w.port)}</td>'
             f"<td>{_esc(w.title)}<br>"
             f'<span class="tag">{_esc(w.rule_id)}</span> '
+            f'<span class="tag">{_esc(w.confidence)}</span> '
             f'<span class="tag">{_esc(w.source_script)}</span></td>'
             f'<td class="desc"><code>{_esc(w.evidence)}</code></td>'
             f'<td class="desc">{_esc(w.recommendation)}</td>'
@@ -289,6 +310,26 @@ def _weakness_rows(analysis: Analysis) -> str:
     if not rows:
         return '<tr><td colspan="6" class="empty">No non-CVE weaknesses detected.</td></tr>'
     return "".join(rows)
+
+
+def _suppressed_block(analysis: Analysis) -> str:
+    """What was deliberately left out, and why.
+
+    A filtered report and a clean target look identical unless the filtering is
+    stated, so every withheld row is accounted for here.
+    """
+    if not analysis.suppressed:
+        return ""
+    items = "".join(
+        f"<li><strong>{count}</strong> {_esc(reason)}</li>"
+        for reason, count in sorted(analysis.suppressed.items(), key=lambda kv: -kv[1])
+    )
+    return (
+        '<h3>Withheld from the tables above</h3><div class="panel">'
+        '<p class="note">Rows excluded to keep the findings actionable. Nothing here was '
+        "discarded — each line says how to bring it back.</p>"
+        f'<ul class="tight">{items}</ul></div>'
+    )
 
 
 def _issues_block(analysis: Analysis) -> str:
@@ -440,6 +481,7 @@ def write_html(analysis: Analysis, path: str, title: str = "Nmap Scan Validation
 
     mode = "offline (NSE output only)" if analysis.offline else "NVD 2.0 + Vulners"
 
+    withheld_block = _suppressed_block(analysis)
     weakness_rows = _weakness_rows(analysis)
     categories = "".join(
         f'<option value="{_esc(c)}">{_esc(c)}</option>'
@@ -535,6 +577,7 @@ def write_html(analysis: Analysis, path: str, title: str = "Nmap Scan Validation
   {_inventory_block(analysis)}
 
   {skipped}
+  {withheld_block}
 
   <h2>Method &amp; limitations</h2>
   <div class="panel"><ul class="tight">

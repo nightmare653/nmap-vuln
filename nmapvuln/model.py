@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import re
 from dataclasses import dataclass, field
 from typing import Optional
@@ -10,6 +11,17 @@ CVE_RE = re.compile(r"CVE-\d{4}-\d{4,7}", re.I)
 
 SEVERITY_ORDER = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1, "NONE": 0, "UNKNOWN": 0}
 CONFIDENCE_ORDER = {"high": 3, "medium": 2, "low": 1}
+
+# How much a non-CVE weakness can be trusted without going back to the host.
+#
+#   confirmed  — the scan observed the condition directly, or the script said
+#                so in as many words. Reportable as it stands.
+#   firm       — derived from structured script output that was parsed rather
+#                than pattern-matched. Wrong only if nmap itself was wrong.
+#   tentative  — a text match that is suggestive but could be something else.
+#                Excluded by default, because a finding the reader has to
+#                disprove costs more than it is worth.
+WEAKNESS_CONFIDENCE = {"confirmed": 3, "firm": 2, "tentative": 1}
 
 
 def severity_from_score(score: Optional[float]) -> str:
@@ -110,11 +122,27 @@ class ScanRun:
     nmap_version: str = ""
     args: str = ""
     start: str = ""
+    start_epoch: Optional[int] = None  # unix time the scan began, when recorded
     end: str = ""
     elapsed: str = ""
     completed: bool = False  # did the scan reach a clean end?
     hosts: list[Host] = field(default_factory=list)
     parse_errors: list[str] = field(default_factory=list)
+
+    @property
+    def reference_time(self) -> "datetime.datetime":
+        """When to judge time-dependent facts, such as certificate expiry.
+
+        A certificate that expires next week was valid when a scan from last
+        year ran, so the scan's own clock is the honest comparison point.
+        Falls back to now when the file did not record a start time.
+        """
+        if self.start_epoch:
+            try:
+                return datetime.datetime.fromtimestamp(self.start_epoch)
+            except (OverflowError, OSError, ValueError):
+                pass
+        return datetime.datetime.now()
 
     @property
     def scan_types(self) -> set[str]:
@@ -148,9 +176,22 @@ class Finding:
     exploit_known: bool = False
     scan_file: str = ""
 
+    # Corroboration from sources that describe the CVE itself rather than the
+    # host. These do not create findings; they rank and qualify the ones a
+    # version match already produced.
+    kev: bool = False  # listed in CISA's Known Exploited Vulnerabilities catalog
+    kev_due: str = ""  # the remediation date CISA set, when listed
+    epss: Optional[float] = None  # FIRST.org probability of exploitation in 30 days
+
+    # True when the banner looks like a distribution package rather than an
+    # upstream build. Distributions backport security fixes without changing
+    # the advertised version, so a version match against one is unreliable.
+    backport_suspected: bool = False
+
     @property
     def sort_key(self) -> tuple:
         return (
+            0 if self.kev else 1,
             -SEVERITY_ORDER.get(self.severity, 0),
             -(self.cvss or 0.0),
             -CONFIDENCE_ORDER.get(self.confidence, 0),
@@ -180,10 +221,17 @@ class Weakness:
     recommendation: str = ""
     source_script: str = ""
     scan_file: str = ""
+    confidence: str = "firm"  # confirmed | firm | tentative
 
     @property
     def sort_key(self) -> tuple:
-        return (-SEVERITY_ORDER.get(self.severity, 0), self.host, self.port, self.rule_id)
+        return (
+            -SEVERITY_ORDER.get(self.severity, 0),
+            -WEAKNESS_CONFIDENCE.get(self.confidence, 0),
+            self.host,
+            self.port,
+            self.rule_id,
+        )
 
 
 @dataclass
@@ -213,6 +261,12 @@ class Analysis:
     skipped_services: list[str] = field(default_factory=list)
     queried: int = 0
     offline: bool = False
+    # reason -> how many rows were withheld for it. Shown in the report so a
+    # short findings table is never mistaken for a clean target.
+    suppressed: dict[str, int] = field(default_factory=dict)
+
+    def suppress(self, reason: str, count: int = 1) -> None:
+        self.suppressed[reason] = self.suppressed.get(reason, 0) + count
 
     @property
     def hosts(self) -> list[Host]:

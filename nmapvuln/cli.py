@@ -12,7 +12,7 @@ from .model import Analysis, SEVERITY_ORDER
 from .parsers import discover, parse_file
 from .report import write_csv, write_html, write_validation_csv, write_weakness_csv
 from .rules import detect
-from .sources import NVDClient, VulnersClient
+from .sources import EpssClient, KevCatalog, NVDClient, VulnersClient
 from .validate import validate
 
 VERSION = "1.0.0"
@@ -45,6 +45,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     p.add_argument("--include-unversioned", action="store_true",
                    help="also match services with no detected version (noisy, low confidence)")
+    p.add_argument("--include-backported", action="store_true",
+                   help="include CVEs matched against distribution-packaged banners "
+                        "(Ubuntu/Debian/RHEL builds carry backported fixes, so these are "
+                        "mostly false positives and are withheld by default)")
+    p.add_argument("--include-tentative", action="store_true",
+                   help="include weaknesses that could not be confirmed from the scan data")
+    p.add_argument("--keyword-search", action="store_true",
+                   help="fall back to NVD keyword search for products with no CPE mapping "
+                        "(returns anything whose text mentions the words; very noisy)")
+    p.add_argument("--no-verify-cpe", action="store_true",
+                   help="skip the local re-check that a returned CVE lists the matched "
+                        "product in its own applicability data")
+    p.add_argument("--kev-only", action="store_true",
+                   help="report only CVEs in CISA's Known Exploited Vulnerabilities catalog")
+    p.add_argument("--no-enrich", action="store_true",
+                   help="skip the CISA KEV and EPSS lookups")
     p.add_argument("--no-rules", action="store_true",
                    help="skip non-CVE weakness detection (weak crypto, misconfiguration)")
     p.add_argument("--no-exposure", action="store_true",
@@ -65,7 +81,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    # --kev-only decides what to keep from the CISA catalog, so without the
+    # catalog it would silently discard every finding. Refuse instead.
+    if args.kev_only and args.offline:
+        parser.error("--kev-only needs the CISA KEV catalog, which --offline cannot fetch")
 
     files = discover(args.paths, recursive=not args.no_recurse)
     if not files:
@@ -87,7 +109,17 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.no_rules:
         print("[*] Checking for non-CVE weaknesses", file=sys.stderr)
-        analysis.weaknesses = detect(analysis.scans, include_exposure=not args.no_exposure)
+        everything = detect(analysis.scans, include_exposure=not args.no_exposure)
+        if args.include_tentative:
+            analysis.weaknesses = everything
+        else:
+            analysis.weaknesses = [w for w in everything if w.confidence != "tentative"]
+        withheld = len(everything) - len(analysis.weaknesses)
+        if withheld:
+            analysis.suppress(
+                "weaknesses the scan data could not confirm (--include-tentative)",
+                withheld,
+            )
 
     cache = Cache(args.cache, ttl=args.cache_ttl, enabled=not args.no_cache)
     nvd = vulners = None
@@ -95,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
         nvd = NVDClient(cache, api_key=args.nvd_key, verbose=args.verbose)
         vulners = VulnersClient(cache, api_key=args.vulners_key, verbose=args.verbose)
         if not args.nvd_key:
-            print("[!] No NVD API key — limited to 5 requests / 30s. Free key: "
+            print("[!] No NVD API key - limited to 5 requests / 30s. Free key: "
                   "https://nvd.nist.gov/developers/request-an-api-key", file=sys.stderr)
     else:
         print("[*] Offline mode: using NSE script output only", file=sys.stderr)
@@ -106,10 +138,38 @@ def main(argv: list[str] | None = None) -> int:
         include_unversioned=args.include_unversioned,
         min_cvss=args.min_cvss,
         verbose=args.verbose,
+        include_backported=args.include_backported,
+        keyword_search=args.keyword_search,
+        verify_cpe=not args.no_verify_cpe,
     )
     matcher.run(analysis)
 
-    for client in (nvd, vulners):
+    kev = epss = None
+    # --kev-only depends on the catalog, so it overrides --no-enrich.
+    if analysis.findings and not args.offline and (not args.no_enrich or args.kev_only):
+        print("[*] Corroborating against CISA KEV and EPSS", file=sys.stderr)
+        kev = KevCatalog(cache, verbose=args.verbose)
+        epss = EpssClient(cache, verbose=args.verbose)
+        catalog = kev.load()
+        scores = epss.scores([f.cve for f in analysis.findings])
+        for finding in analysis.findings:
+            cve_id = finding.cve.upper()
+            if cve_id in catalog:
+                finding.kev = True
+                finding.kev_due = catalog[cve_id]
+                finding.exploit_known = True
+            if cve_id in scores:
+                finding.epss = scores[cve_id]
+        analysis.findings.sort(key=lambda f: f.sort_key)
+
+    if args.kev_only:
+        keeping = [f for f in analysis.findings if f.kev]
+        withheld = len(analysis.findings) - len(keeping)
+        if withheld:
+            analysis.suppress("CVE rows not listed in CISA KEV (--kev-only)", withheld)
+        analysis.findings = keeping
+
+    for client in (nvd, vulners, kev, epss):
         if client is not None:
             for err in client.errors:
                 print(f"[!] {err}", file=sys.stderr)
@@ -134,6 +194,12 @@ def main(argv: list[str] | None = None) -> int:
           f"{weak['CRITICAL']} critical, {weak['HIGH']} high, "
           f"{weak['MEDIUM']} medium, {weak['LOW']} low", file=sys.stderr)
     print(f"[+] scan validation: {errors} error(s), {warns} warning(s)", file=sys.stderr)
+    for reason, count in sorted(analysis.suppressed.items(), key=lambda kv: -kv[1]):
+        print(f"[~] withheld {count} {reason}", file=sys.stderr)
+    kev_count = sum(1 for f in analysis.findings if f.kev)
+    if kev_count:
+        print(f"[!] {kev_count} finding(s) are in CISA's Known Exploited "
+              f"Vulnerabilities catalog - treat these first", file=sys.stderr)
     if analysis.skipped_services:
         print(f"[!] {len(set(analysis.skipped_services))} service(s) unassessed "
               f"(no version) - re-run with --include-unversioned to include them", file=sys.stderr)
