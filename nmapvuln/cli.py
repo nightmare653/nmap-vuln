@@ -10,7 +10,15 @@ from .cache import DEFAULT_TTL, Cache
 from .match import Matcher
 from .model import Analysis, SEVERITY_ORDER
 from .parsers import discover, parse_file
-from .report import write_csv, write_html, write_validation_csv, write_weakness_csv
+from .report import (
+    write_csv,
+    write_enumeration_csv,
+    write_html,
+    write_json,
+    write_markdown,
+    write_validation_csv,
+    write_weakness_csv,
+)
 from .rules import detect
 from .sources import EpssClient, KevCatalog, NVDClient, VulnersClient
 from .validate import validate
@@ -65,6 +73,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="skip non-CVE weakness detection (weak crypto, misconfiguration)")
     p.add_argument("--no-exposure", action="store_true",
                    help="skip weaknesses raised purely from a service being reachable")
+    p.add_argument("--no-playbook", action="store_true",
+                   help="omit the per-port enumeration playbook from the report")
     p.add_argument("--min-cvss", type=float, default=0.0, help="drop findings below this CVSS score")
     p.add_argument("--fail-on", choices=["none", "low", "medium", "high", "critical"],
                    default="none", help="exit non-zero if a finding at or above this severity exists")
@@ -176,10 +186,16 @@ def main(argv: list[str] | None = None) -> int:
     cache.close()
 
     base = os.path.join(args.out, args.name)
-    html_path = write_html(analysis, base + ".html", title=args.title)
+    html_path = write_html(analysis, base + ".html", title=args.title,
+                           include_playbook=not args.no_playbook)
     csv_path = write_csv(analysis, base + "-findings.csv")
     weak_path = write_weakness_csv(analysis, base + "-weaknesses.csv")
     val_path = write_validation_csv(analysis, base + "-validation.csv")
+    enum_path = ""
+    if not args.no_playbook:
+        enum_path = write_enumeration_csv(analysis, base + "-enumeration.csv")
+    json_path = write_json(analysis, base + ".json")
+    md_path = write_markdown(analysis, base + ".md", title=args.title)
 
     counts = analysis.counts_by_severity()
     weak = analysis.weakness_counts_by_severity()
@@ -207,6 +223,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[+] {csv_path}", file=sys.stderr)
     print(f"[+] {weak_path}", file=sys.stderr)
     print(f"[+] {val_path}", file=sys.stderr)
+    if enum_path:
+        print(f"[+] {enum_path}", file=sys.stderr)
+    print(f"[+] {md_path}", file=sys.stderr)
+    print(f"[+] {json_path}", file=sys.stderr)
 
     if args.fail_on != "none":
         threshold = SEVERITY_ORDER[args.fail_on.upper()]

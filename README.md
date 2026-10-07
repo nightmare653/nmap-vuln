@@ -1,299 +1,442 @@
 # nmapvuln
 
-Validates nmap scan output and correlates the detected services with known CVEs,
-then writes a self-contained HTML report and CSVs.
+**Turn an nmap scan into a clear vulnerability report.** You run nmap and save
+its output; nmapvuln reads that output, matches the services it found against
+known CVEs, flags weak configuration and crypto, ranks everything by what is
+actually being exploited in the wild, and writes a self-contained HTML report
+(plus CSV, Markdown and JSON) with a step-by-step enumeration playbook.
 
-It does three separate jobs, and keeps them separate in the report:
+> [!IMPORTANT]
+> **nmapvuln does not scan anything itself.** It never touches a target. You run
+> `nmap` first and save the output to a file, then point nmapvuln at that file.
+> Everything in the report comes from reading your existing scan.
 
-1. **Validation** — is the scan itself trustworthy? Did it finish? Was `-sV` used?
-   Did every port come back filtered? Do two scans of the same host disagree?
-   A thin vulnerability list caused by a bad scan looks identical to a clean
-   target unless someone says so explicitly.
-2. **CVE correlation** — which known CVEs affect the services that were
-   identified, and how confident is each match.
-3. **Non-CVE weaknesses** — weak Diffie-Hellman groups, RC4/3DES/export cipher
-   suites, SSLv3, expired and self-signed certificates, weak SSH algorithms,
-   SMB signing disabled, SMBv1, anonymous FTP, open DNS recursion, exposed
-   datastores, cleartext protocols. None of this has a CVE, so none of it shows
-   up in a CPE match — and in bug bounty work it is often the more directly
-   reportable half.
+Pure Python standard library — **no `pip install` needed**, works on Python 3.9+.
 
-The design goal is precision. A finding you have to disprove costs more time
-than it saves, so anything the scan data cannot actually support is withheld and
-counted rather than printed — see [Accuracy](#accuracy). Findings are then ranked
-by whether the vulnerability is known to be exploited in the wild, not by CVSS
-alone.
+---
 
-Pure stdlib, no dependencies, Python 3.9+.
+## Contents
 
-## Usage
+- [Requirements](#requirements)
+- [Install](#install)
+- [Quick start (3 steps)](#quick-start-3-steps)
+- [Command-line options — every flag explained](#command-line-options--every-flag-explained)
+- [Understanding the report](#understanding-the-report)
+- [The output files](#the-output-files)
+- [Getting a free NVD API key](#getting-a-free-nvd-api-key)
+- [Troubleshooting](#troubleshooting)
+- [How it stays accurate](#how-it-stays-accurate)
+- [What it checks for](#what-it-checks-for)
+- [Knowledge base & enumeration playbook](#knowledge-base--enumeration-playbook)
+- [Running the tests](#running-the-tests)
+- [Project layout](#project-layout)
+- [Authorisation & legal](#authorisation--legal)
+
+---
+
+## Requirements
+
+| You need | Why | Check it with |
+|---|---|---|
+| **Python 3.9 or newer** | runs the tool | `python --version` |
+| **nmap** | produces the scan nmapvuln reads | `nmap --version` |
+
+That is all. nmapvuln has **no third-party dependencies** — you do not run
+`pip install` for anything. (The only optional extra, `openpyxl`, is needed just
+to rebuild the bundled knowledge base from its spreadsheet, which you will
+probably never do.)
+
+On Windows, if `python` is not found, try `py` instead of `python` in every
+command below.
+
+---
+
+## Install
 
 ```bash
-python nmapvuln.py scans/ -o report/
+git clone https://github.com/nightmare653/nmap-vuln.git
+cd nmap-vuln
 ```
 
-Takes `.xml`, `.nmap`, `.gnmap` (and `.gmap`) files or directories, in any mix.
-Directories are searched recursively. Files with unknown extensions are sniffed
-by content.
+That is the whole install. You now run it with `python nmapvuln.py …`.
+
+---
+
+## Quick start (3 steps)
+
+### Step 1 — Scan a target with nmap and save the output
+
+nmapvuln reads nmap's output, so you need a saved scan first. Use `-oA` to save
+the result (the `-oA target` part writes `target.xml`, `target.nmap` and
+`target.gnmap` — nmapvuln prefers the `.xml`):
 
 ```bash
-# with an NVD API key (10x the rate limit — free, strongly recommended)
-python nmapvuln.py scans/ --nvd-key "$NVD_API_KEY"
+nmap -sV -sC -oA target 192.0.2.10
+```
 
-# no network at all: report only CVEs the scan itself already found via NSE
-python nmapvuln.py scans/ --offline
+What those nmap flags mean:
 
-# only serious, and exit non-zero if anything critical is present (for CI)
+- `-sV` — detect the **version** of each service. **This is the most important
+  one**: without it nmapvuln only knows "something is on port 80", not "Apache
+  2.4.49", and cannot match CVEs.
+- `-sC` — run nmap's default scripts (gets you TLS cipher info, SMB settings,
+  etc. that power the weakness checks).
+- `-oA target` — save the output to files named `target.*`.
+- `192.0.2.10` — the target (use a hostname, IP, or range you are allowed to
+  scan).
+
+For the **best** coverage, use this scan instead — it adds the scripts the
+weakness checks rely on:
+
+```bash
+nmap -sV -sC --script "vuln,ssl-enum-ciphers,ssl-dh-params,ssh2-enum-algos,smb-security-mode,smb-protocols" -p- -oA target 192.0.2.10
+```
+
+### Step 2 — Run nmapvuln on the saved output
+
+Point it at the file (or a folder of scans — it searches folders for you):
+
+```bash
+python nmapvuln.py target.xml -o report
+```
+
+- `target.xml` — the scan file from step 1 (you can also pass `target.nmap`,
+  `target.gnmap`, or a whole directory).
+- `-o report` — write the report into a folder called `report`.
+
+The first run with no API key is a little slow because the public CVE database
+(NVD) limits anonymous requests. Results are cached for a week, so the next run
+over the same services is instant. See [Getting a free NVD API
+key](#getting-a-free-nvd-api-key) to speed it up, or add `--offline` to skip the
+network entirely.
+
+### Step 3 — Open the report
+
+Open `report/report.html` in any browser. It is a single self-contained file —
+no internet needed to view it, works in light and dark mode. Start on the
+**Overview** tab and click through the others.
+
+```bash
+# macOS
+open report/report.html
+# Windows
+start report/report.html
+# Linux
+xdg-open report/report.html
+```
+
+---
+
+## Command-line options — every flag explained
+
+Run `python nmapvuln.py --help` to see this list any time. Below, each flag is
+explained in plain language with when you would use it.
+
+### Where the report goes
+
+| Flag | What it does | When to use it |
+|---|---|---|
+| `-o DIR`, `--out DIR` | Folder to write the report into. Default: `nmapvuln-report`. | Always — give each engagement its own folder, e.g. `-o client-report`. |
+| `--name NAME` | Base filename for the outputs. Default: `report` (so you get `report.html`, `report-findings.csv`, …). | If you want files named after the target, e.g. `--name web01`. |
+| `--title TEXT` | The heading shown at the top of the HTML report. | To label the report, e.g. `--title "Acme external scan"`. |
+
+### Speed and data sources
+
+| Flag | What it does | When to use it |
+|---|---|---|
+| `--nvd-key KEY` | Your free NVD API key (or set the `NVD_API_KEY` environment variable). Raises the request limit from 5 to 50 per 30 seconds — about 10× faster. | Strongly recommended. Get one free in [Step-by-step below](#getting-a-free-nvd-api-key). |
+| `--vulners-key KEY` | Optional Vulners API key (or `VULNERS_API_KEY`). Adds extra exploit-availability data. | Only if you have a Vulners account. Safe to ignore. |
+| `--offline` | Do not use the network at all. Reports only the CVEs nmap itself already found (via its `vuln`/`vulners` scripts). | No internet, air-gapped work, or a quick first pass. |
+| `--no-enrich` | Skip the CISA KEV and EPSS lookups (the "is it being exploited?" ranking data). | Rarely. The ranking is one of the most useful parts. |
+| `--kev-only` | Show **only** CVEs that appear in CISA's Known Exploited Vulnerabilities catalog — i.e. the ones confirmed to be used in real attacks. | When you want the shortest "fix these first" list. (Needs the internet; cannot be combined with `--offline`.) |
+
+### Controlling noise vs. completeness
+
+By default nmapvuln **hides** low-quality matches to keep the report trustworthy,
+and tells you how many it hid. These flags bring the hidden items back.
+
+| Flag | What it does | When to use it |
+|---|---|---|
+| `--include-unversioned` | Also match services where no version was detected ("this software has had CVEs" rather than "this host is vulnerable"). Very noisy. | When you want leads even without versions. Expect many more rows. |
+| `--include-backported` | Include CVEs matched against a distribution build (e.g. `OpenSSH 8.2p1 Ubuntu…`). These are usually false positives because the vendor patched without changing the version string. | When you specifically want to review those possibilities yourself. |
+| `--include-tentative` | Include weaknesses the scan could not confirm — e.g. a service guessed from the port number because `-sV` was not used. | When a scan lacked `-sV` and you want best-effort guesses. |
+| `--keyword-search` | For products with no known CPE mapping, fall back to searching NVD by keyword. Returns anything whose text mentions the words — lots of unrelated CVEs. | Last resort for an unusual product. Expect noise. |
+| `--no-verify-cpe` | Turn off the local double-check that a returned CVE actually lists the matched product. | Debugging only. Leave it on. |
+
+### Turning features off
+
+| Flag | What it does | When to use it |
+|---|---|---|
+| `--no-rules` | Skip the non-CVE weakness detection entirely (weak crypto, SMB signing, anonymous access, …). | If you only care about CVE matches. |
+| `--no-exposure` | Keep the script-based weakness rules but drop the ones raised purely because a service is reachable (e.g. "a database is exposed"). | To cut down "reachability" noise on a big internal range. |
+| `--no-playbook` | Leave the per-port enumeration playbook out of the report (and skip its CSV). | If you only want findings, not next-step guidance. |
+
+### Filtering and pass/fail (useful in CI)
+
+| Flag | What it does | When to use it |
+|---|---|---|
+| `--min-cvss N` | Drop CVE findings scoring below `N` (0–10). Does **not** affect non-CVE weaknesses, which have no score. | Focus on serious CVEs, e.g. `--min-cvss 7.0`. |
+| `--fail-on LEVEL` | Make the program exit with code `2` if any finding **or** weakness is at or above `LEVEL` (`low`, `medium`, `high`, or `critical`). | In automation/CI, to fail a build when something serious is present: `--fail-on critical`. |
+
+### The cache
+
+Lookups are cached so repeat runs are fast and free.
+
+| Flag | What it does | When to use it |
+|---|---|---|
+| `--cache PATH` | Where to store the cache database. Default: `~/.cache/nmapvuln/cve-cache.sqlite`. | To put the cache somewhere specific. |
+| `--cache-ttl SECS` | How long cached results stay valid, in seconds. Default: `604800` (7 days). | To refresh more or less often. |
+| `--no-cache` | Do not read or write the cache at all. | To force completely fresh lookups. |
+
+### Input and logging
+
+| Flag | What it does | When to use it |
+|---|---|---|
+| `--no-recurse` | When you pass a folder, do **not** look in sub-folders. | If a folder has nested scans you want to ignore. |
+| `-v`, `--verbose` | Print every database query and extra detail while running. | To see what it is doing, or to debug. |
+| `--version` | Print the version and exit. | — |
+| `-h`, `--help` | Print the full option list and exit. | Any time. |
+
+### Exit codes (for scripts)
+
+| Code | Meaning |
+|---|---|
+| `0` | Success. |
+| `1` | No nmap output files were found in what you pointed it at. |
+| `2` | The `--fail-on` threshold was met, **or** you used the options wrong. |
+
+### Copy-paste examples
+
+```bash
+# Simplest run: one scan file, report into ./report
+python nmapvuln.py target.xml -o report
+
+# A whole folder of scans, with a free API key for speed
+python nmapvuln.py scans/ -o report --nvd-key "$NVD_API_KEY"
+
+# No internet — use only what nmap already found
+python nmapvuln.py target.xml -o report --offline
+
+# CI gate: only serious CVEs, fail the build if anything critical exists
 python nmapvuln.py scans/ --min-cvss 7.0 --fail-on critical
 
-# include services where no version was detected (noisy, low confidence)
-python nmapvuln.py scans/ --include-unversioned
+# Shortest "fix these first" list — only actively-exploited CVEs
+python nmapvuln.py scans/ -o report --kev-only
 
-# only what is known to be exploited in the wild
-python nmapvuln.py scans/ --kev-only
-
-# show everything, including what is withheld by default
-python nmapvuln.py scans/ --include-backported --include-tentative --keyword-search
+# Show everything, including the items hidden by default
+python nmapvuln.py scans/ -o report --include-backported --include-tentative --include-unversioned
 ```
 
-### Options
+---
 
-| Flag | Meaning |
+## Understanding the report
+
+Open `report.html` and use the tabs across the top:
+
+| Tab | What's in it |
 |---|---|
-| `-o, --out DIR` | output directory (default `nmapvuln-report`) |
-| `--name NAME` | base filename for the outputs (default `report`) |
-| `--title TEXT` | report title |
-| `--nvd-key KEY` | NVD API key, or set `NVD_API_KEY`. Raises the limit from 5 to 50 requests/30s |
-| `--vulners-key KEY` | Vulners API key, or set `VULNERS_API_KEY`. Optional; adds exploit availability |
-| `--offline` | no network; NSE-derived findings only |
-| `--include-unversioned` | also match products with no detected version |
-| `--include-backported` | include CVEs matched against a distribution-packaged banner |
-| `--include-tentative` | include weaknesses the scan data could not confirm |
-| `--keyword-search` | fall back to NVD keyword search for products with no CPE mapping |
-| `--no-verify-cpe` | skip the local re-check of a CVE's own applicability data |
-| `--kev-only` | report only CVEs in CISA's Known Exploited Vulnerabilities catalog |
-| `--no-enrich` | skip the CISA KEV and EPSS lookups |
-| `--no-rules` | skip non-CVE weakness detection entirely |
-| `--no-exposure` | keep the script-based rules but drop weaknesses raised purely from a service being reachable |
-| `--min-cvss N` | drop CVE findings scoring below N. Does not apply to non-CVE weaknesses, which carry no score |
-| `--fail-on LEVEL` | exit 2 if any CVE finding **or** non-CVE weakness is at or above `low\|medium\|high\|critical` |
-| `--cache PATH` | cache database (default `~/.cache/nmapvuln/cve-cache.sqlite`) |
-| `--cache-ttl SECS` | cache lifetime, default 7 days |
-| `--no-cache` | bypass the cache |
-| `--no-recurse` | do not descend into subdirectories |
-| `-v, --verbose` | log every API query |
+| **Overview** | The headline counts, whether the scan is trustworthy, the list of scan files, and a **Suggested next scan** (ready-made nmap commands built from what was found). |
+| **CVE Findings** | Known CVEs for the detected services. Filter by severity/confidence/text, export to CSV, and **click a port to jump to how to enumerate it**. |
+| **Weaknesses** | Problems with no CVE: weak TLS/SSH, missing SMB signing, anonymous access, expired certificates, cleartext services. These come from what the scan *observed*, so they are usually the most reliable findings. |
+| **Enumeration** | For each open port, the exact commands to run next to confirm a finding, with the host and port already filled in. Every command has a **copy** button. |
+| **Service KB** | A deep per-service knowledge base (what to try, what to expect) for 33 services. Services you found are expanded first; the rest are searchable below. |
+| **Network Attacks** | Network-wide techniques (LLMNR poisoning, mitm6, VLAN hopping, …). A "Relevant to this scan" group at the top shows which ones your scan gives evidence for, and why. |
+| **Per-host** | Everything about one host — its ports, CVEs, weaknesses and leads — in one place. |
+| **Inventory** | Every host and open port found, with an **Export CSV** button. |
 
-Exit codes: `0` success, `1` no input files found, `2` `--fail-on` threshold met
-(or a usage error, which argparse also reports as 2).
+Two ideas that make the report trustworthy:
 
-`--kev-only` needs the CISA catalog, so it overrides `--no-enrich` and is
-rejected together with `--offline` rather than silently emptying the report.
+- **Nothing is silently hidden.** When a filter removes rows (e.g. likely
+  backported CVEs), the report shows a *"Withheld"* note with the exact count and
+  the flag that brings them back. A short report never looks the same as a clean
+  target.
+- **Findings are ranked by real-world risk**, not just CVSS. A CVE in CISA's
+  exploited catalog sorts to the top and is tagged `KEV`; each row also shows its
+  EPSS score (the probability it will be exploited in the next 30 days).
 
-## Output
+---
 
-- `report.html` — the report: validation issues, CVE findings table, non-CVE
-  weakness table (both with live severity/category/text filters), host and
-  service inventory, limitations. Self-contained, no external resources, works
-  in light and dark.
-- `report-findings.csv` — one row per host/port/CVE, with the KEV flag, the CISA
-  remediation date, the EPSS probability and the backport suspicion.
-- `report-weaknesses.csv` — one row per non-CVE weakness, with its confidence,
-  the evidence line and a remediation note.
-- `report-validation.csv` — one row per scan-quality issue.
+## The output files
 
-Every row withheld by a default filter is counted in the report, under
-*Withheld from the tables above*, with the flag that brings it back. A filtered
-report and a clean target are otherwise indistinguishable.
+All written into your `-o` folder:
 
-## Accuracy
-
-Three things are withheld by default, because each is wrong far more often than
-it is right.
-
-**Backported fixes.** Distributions patch vulnerabilities without changing the
-advertised version, so an Ubuntu `OpenSSH 8.2p1` matches every CVE ever filed
-against upstream 8.2 while being vulnerable to none of them. When the banner
-names a distribution build (`8.2p1 Ubuntu 4ubuntu0.5`, `1.1.1f-1ubuntu2.16`,
-`2.4.6-1.el7`), the CVE rows are withheld and counted. `--include-backported`
-returns them.
-
-**Keyword search.** With no CPE mapping for a product, the only option is an NVD
-keyword query, which returns everything whose text mentions the words. That is
-dozens of unrelated CVEs per port. Unmapped products are now listed as
-unassessed instead, and `--keyword-search` restores the old behaviour.
-
-**Unconfirmable weaknesses.** Without `-sV`, nmap names a service from the port
-number alone, so "MySQL on 3306" is a guess about what is listening. Weaknesses
-resting on a guess are graded `tentative` and withheld; `--include-tentative`
-shows them.
-
-Two checks run on everything that is kept. Each CVE returned by NVD is re-read
-locally to confirm its own applicability data names the product that was matched
-(`--no-verify-cpe` disables this), and every script with structured output is
-parsed into values rather than pattern-matched, so a rule compares a certificate
-date against the scan clock rather than looking for the phrase "not valid after"
-— which nmap prints for healthy certificates too.
-
-The measurable effect, on the two fixtures in `samples/`:
-
-| Fixture | Before | After |
-|---|---|---|
-| `sample-healthy.xml` (nothing wrong with it) | 9 weaknesses, incl. 1 critical | 2, both plain reachability, graded low |
-| `sample-scripts.xml` (genuinely broken) | 31 weaknesses | 31, same 30 rule ids |
-
-## Ranking: what to look at first
-
-A correct CVE list for an old Apache still runs to a hundred rows. Two free
-sources, neither needing a key, decide the order:
-
-- **CISA KEV** — the Known Exploited Vulnerabilities catalog. A CVE listed here
-  has been observed in real attacks, which is a stronger signal than any score.
-  KEV rows sort to the top of every table and carry CISA's remediation date.
-  `--kev-only` drops everything else.
-- **EPSS** (FIRST.org) — the probability a CVE will be exploited in the next 30
-  days, shown as a percentage on each row.
-
-Both are cached like every other lookup, and `--no-enrich` skips them.
-
-## Match confidence
-
-This is the part that decides whether the report is useful or noise:
-
-| Confidence | How the match was made |
+| File | What it is |
 |---|---|
-| **high** | nmap emitted a CPE including a version; NVD did the version-range matching |
-| **medium** | version was probed, but the CPE was synthesised from a product-name map, or matched by keyword |
-| **low** | product identified but no version — "this software has had CVEs", not "this host is vulnerable" |
+| `report.html` | The main report (the tabs above). Self-contained, open in any browser. |
+| `report.md` | The whole report as Markdown — paste into notes or a ticket. |
+| `report.json` | The same data as JSON — feed it to other tools or scripts. |
+| `report-findings.csv` | One row per host/port/CVE (with KEV flag, EPSS, CISA due date). |
+| `report-weaknesses.csv` | One row per non-CVE weakness, with evidence and a fix. |
+| `report-validation.csv` | One row per scan-quality issue. |
+| `report-enumeration.csv` | One row per enumeration step, commands filled in. (Skipped with `--no-playbook`.) |
 
-Low-confidence matches are **excluded by default**; `--include-unversioned`
-turns them on. On the sample data that flag takes the finding count from 152 to
-1480, which is the entire reason it is off by default.
+---
 
-Findings parsed from `.nmap` and `.gnmap` are capped at medium, because those
-formats carry no CPEs.
+## Getting a free NVD API key
 
-Non-CVE weaknesses carry their own, separate confidence:
+Without a key, the public CVE database limits you to 5 requests every 30 seconds
+(slow but it works). A free key raises that to 50 — about 10× faster.
+
+1. Go to <https://nvd.nist.gov/developers/request-an-api-key>.
+2. Fill in the short form; the key is emailed to you instantly.
+3. Use it one of two ways:
+
+```bash
+# Pass it on the command line
+python nmapvuln.py scans/ --nvd-key YOUR-KEY-HERE
+
+# …or set it once in your shell so you don't repeat it
+export NVD_API_KEY=YOUR-KEY-HERE        # macOS/Linux
+setx NVD_API_KEY YOUR-KEY-HERE          # Windows (new terminals)
+python nmapvuln.py scans/
+```
+
+Results are cached for a week, so repeat runs over the same services cost nothing
+either way.
+
+---
+
+## Troubleshooting
+
+**"No nmap output files found (.xml, .nmap, .gnmap)."**
+You pointed nmapvuln at something with no scan files in it. Make sure you ran
+nmap with `-oA` (or `-oX`) first, and that you are passing the right file or
+folder. Remember: nmapvuln reads nmap's output — it does not scan.
+
+**The report has very few findings.**
+Check the **Overview** tab first. If it shows warnings like `NO_VERSION_DETECTION`
+or `ALL_FILTERED`, the thin result is the scan's fault, not a clean target. Re-run
+nmap with `-sV -sC`. Also check the *"Withheld"* note — some rows may be hidden by
+default (bring them back with `--include-*` flags).
+
+**It is slow / it pauses.**
+That is the anonymous NVD rate limit. Get a [free API key](#getting-a-free-nvd-api-key),
+or run with `--offline` for a quick first pass.
+
+**`python: command not found` (Windows).**
+Use `py` instead: `py nmapvuln.py target.xml -o report`.
+
+**I see a CVE I think is wrong.**
+Likely a backported fix (the vendor patched without changing the version string).
+nmapvuln hides these by default; `--include-backported` shows them. Treat all CVE
+matches as **leads to verify**, not proof — see below.
+
+---
+
+## How it stays accurate
+
+The goal is precision: a finding you have to disprove wastes more time than it
+saves. Three kinds of weak match are **hidden by default** (and counted, with the
+flag to show them):
+
+- **Backported fixes** — distributions patch CVEs without changing the version
+  string, so `OpenSSH 8.2p1 Ubuntu…` would otherwise match every 8.2 CVE while
+  being vulnerable to none. (`--include-backported`)
+- **Keyword matches** — for products with no CPE mapping, a keyword search returns
+  dozens of unrelated CVEs. Those products are listed as "unassessed" instead.
+  (`--keyword-search`)
+- **Unconfirmable weaknesses** — a service guessed from the port number (no
+  `-sV`) is a guess, not an observation, so weaknesses resting on it are held
+  back. (`--include-tentative`)
+
+Everything kept is double-checked: each CVE is re-read locally to confirm it
+really lists the matched product, and structured scripts are parsed into real
+values (so, for example, a certificate's expiry date is compared to the scan
+date rather than matching the words "not valid after", which every healthy
+certificate also prints).
+
+**Match confidence** on each CVE row:
 
 | Confidence | Meaning |
 |---|---|
-| **confirmed** | the scan observed the condition, or the script said so outright |
-| **firm** | derived from structured script output that was parsed, not pattern-matched |
-| **tentative** | suggestive, but could be something else. Withheld by default |
+| **high** | nmap gave a CPE with a version; NVD did exact version-range matching |
+| **medium** | version known, but the CPE was synthesised or keyword-matched |
+| **low** | product known but no version — "has had CVEs", not "is vulnerable" (hidden unless `--include-unversioned`) |
 
-Sources are merged rather than ranked: when NVD and an NSE script both report a
-CVE, the row shows `nse+nvd` and keeps NVD's score, vector and description
-alongside the script's exploit flag.
+**Weakness confidence:** `confirmed` (the scan saw it), `firm` (parsed from
+structured output), or `tentative` (a guess; hidden by default).
 
-## Non-CVE weakness rules
+---
 
-Rules live in [`nmapvuln/rules.py`](nmapvuln/rules.py) and fire two ways.
+## What it checks for
 
-**Analysers** handle every script with real structure. The script's output is
-parsed into values by [`nmapvuln/scriptdata.py`](nmapvuln/scriptdata.py) and the
-rule reasons over those: `ssl-cert` becomes a certificate with a key type, a bit
-count and two dates; `ssh2-enum-algos` becomes four separate algorithm lists;
-`ssl-enum-ciphers` becomes a set of protocol versions each with its own cipher
-list. This is what stops a MAC name matching inside a cipher list, a `NULL`
-compressor being read as a NULL cipher suite, and a 256-bit Ed25519 key being
-called undersized against an RSA threshold.
+**CVE correlation** matches detected services against the NVD database (and
+optionally Vulners), then ranks by CISA KEV and EPSS.
 
-**Pattern rules** cover scripts whose whole output is already a verdict, such as
-`ftp-anon`'s "Anonymous FTP login allowed". These scan every match in the output,
-not just the first, so a 1024-bit value listed after a 2048-bit one is still
-found.
+**Non-CVE weakness rules** cover, among others:
 
-Adding a rule is an entry in `SPECS` plus either a table row or a few lines in an
-analyser.
-
-| Area | Rules |
+| Area | Examples |
 |---|---|
-| **TLS** | weak DH group (`< 2048`), export-grade DH (Logjam), anonymous DH, SSLv2 (DROWN), SSLv3 (POODLE), TLS 1.0/1.1, NULL cipher, export cipher (FREAK), RC4, 3DES (Sweet32), weak nmap cipher grade, expired cert, self-signed cert, MD5/SHA-1 signature, undersized key, Heartbleed, CCS injection |
-| **SSH** | weak KEX (`group1-sha1`, `group-exchange-sha1`), weak MACs (`hmac-md5`, `hmac-sha1-96`, bare `umac-64`), CBC/arcfour ciphers, `ssh-dss` host key, undersized host key (per algorithm), SSHv1 |
-| **SMB** | signing disabled or not required, SMBv1, guest/anonymous access |
-| **Services** | anonymous FTP (and writable anonymous FTP), open DNS recursion, default SNMP community, NFS exports, HTTP PUT/DELETE, TRACE, open proxy, exposed `.git`, backup/config files, directory listing, LDAP anonymous bind, RDP without NLA, VNC without auth, unauthenticated MongoDB/Redis/Elasticsearch, empty-password MySQL |
-| **Exposure** | cleartext protocols reachable (telnet, FTP, rlogin, rsh, finger, POP3/IMAP without TLS), datastores reachable (MySQL, MSSQL, PostgreSQL, MongoDB, Redis, memcached, Elasticsearch, Docker/Kubernetes API, …) |
-| **Catch-all** | any NSE script declaring `State: VULNERABLE` that cites no CVE — suppressed when a specific rule already covered that script, so nothing is reported twice |
+| **TLS** | weak/export/anonymous Diffie-Hellman, SSLv2/SSLv3, TLS 1.0/1.1, NULL/RC4/3DES/export ciphers, expired or self-signed certs, MD5/SHA-1 signatures, undersized keys, Heartbleed, CCS injection |
+| **SSH** | weak key exchange/MAC/cipher, DSA host keys, undersized host keys, SSHv1 |
+| **SMB** | signing not required, SMBv1, guest/anonymous access |
+| **Services** | anonymous FTP, open DNS recursion, default SNMP community, NFS exports, risky HTTP methods, exposed `.git`/backups, LDAP anonymous bind, RDP without NLA, VNC without auth, unauthenticated MongoDB/Redis/Elasticsearch, empty-password MySQL |
+| **Exposure** | cleartext protocols and internal datastores reachable on the scanned interface |
 
-Host scripts (`hostscript`, where `smb-*` results live) are examined as well as
-per-port scripts. Exposure rules skip ports nmap recorded as TLS-tunnelled, so
-FTPS on 990 is not flagged as cleartext FTP, and they are graded `tentative` when
-the service was guessed from the port number rather than probed.
+**Scan validation** flags problems with the scan itself so you don't mistake a
+bad scan for a clean target: incomplete scans, no version detection, all-filtered
+hosts, aggressive timing, the same host disagreeing between two scans, and more.
 
-Rules deliberately left conservative, because flagging them buries everything
-else: `hmac-sha1` and `ssh-rsa` in SSH, `diffie-hellman-group14-sha1`, and a null
-SMB session used only to read the security mode. Genuine guest access and
-readable shares are still reported.
+---
 
-## Validation checks
+## Knowledge base & enumeration playbook
 
-Scan-level: `SCAN_INCOMPLETE`, `PARSE_ERROR`, `NO_VERSION_DETECTION`, `NO_NSE`,
-`DEFAULT_PORT_RANGE`, `NO_UDP`, `AGGRESSIVE_TIMING`, `NO_RETRIES`, `PN_USED`,
-`LOSSY_FORMAT`, `NO_HOSTS`, `NO_COMMAND_LINE`.
+The report includes reference material to help you act on findings:
 
-Host-level: `HOST_DOWN`, `HOST_UP_NO_OPEN`, `ALL_FILTERED`, `TCPWRAPPED`,
-`NO_PRODUCT`, `NO_VERSION`, `LOW_CONFIDENCE_FINGERPRINT`.
+- **Enumeration playbook** — per open port, the standard commands to confirm a
+  finding, with host and port filled in.
+- **Service KB** — a deep per-service knowledge bank (33 services) organised by
+  phase (enumeration → exploitation), built from a spreadsheet.
+- **Network Attacks** — network-wide techniques, with a scan-aware "Relevant to
+  this scan" group that explains *why* each one applies to your target.
 
-Cross-file: `DUPLICATE_HOST`, `STATE_CONFLICT`, `VERSION_CONFLICT` — the same
-host scanned twice with different results, which usually means filtering or
-rate limiting interfered with one of the runs.
+> [!WARNING]
+> This material is **methodology reference**. The tool never runs any of it —
+> it only prints the checklist. Everything in the playbook is *enumeration*
+> (reading what a service exposes), not exploitation. **Only run these commands
+> against systems you are authorised to test.**
 
-A truncated XML file (interrupted scan) is rewound to the last complete `<host>`
-block and parsed anyway, with the truncation reported.
+---
 
-## Limitations
-
-**CVE findings** come from **service banners**, so they are leads to verify, not
-confirmed vulnerabilities. The dominant false positive is **backported patches**:
-distributions fix CVEs without changing the advertised version string, so a
-Debian `OpenSSH 7.4` may well be patched against everything listed against it.
-Those rows are withheld by default now, but the detection is a heuristic over the
-banner text: a distribution build whose banner says nothing about the
-distribution still slips through, and `--include-backported` shows what was held
-back. Neither direction is a substitute for asking the host what it has patched.
-
-**Non-CVE weaknesses** do not share that problem — they come from what the scan
-actually observed (negotiated ciphers, DH moduli, certificate fields, script
-conclusions), so they do not depend on banner accuracy. Where a rule reads a
-script's own verdict, it inherits that script's reliability.
-
-Both kinds are limited by coverage: ports outside the scanned range and services
-behind filtering are untested rather than proven safe, and a rule can only fire
-if the script that feeds it was actually run — so scan with `-sV -sC` at minimum.
-The tool only reads existing scan output; it never touches the target.
-
-## Getting an NVD API key
-
-Free, issued instantly: <https://nvd.nist.gov/developers/request-an-api-key>.
-Without one you get 5 requests per 30 seconds, which is slow but works — results
-are cached for a week, so repeat runs over the same services cost nothing.
-
-## Tests
+## Running the tests
 
 ```bash
 python tests/test_nmapvuln.py
 ```
 
-111 tests covering the three parsers, truncation recovery, CPE construction,
-version-string splitting, confidence assignment, source merging, validation, the
-weakness rules, and one regression test per false positive the tool has produced.
-No test touches the network.
+147 tests covering the parsers, CVE matching, the weakness rules, the knowledge
+banks, the exports, and one regression test for every false positive the tool has
+ever produced. No test touches the network. Test fixtures live in `samples/` and
+can be rebuilt with `python tests/make_samples.py`.
 
-The `samples/` directory holds the fixtures:
+---
 
-| Fixture | What it is for |
-|---|---|
-| `sample.xml`, `sample.gnmap`, `sample.nmap` | one host across all three formats, plus a filtered host and a truncation source |
-| `sample-scripts.xml` | realistic NSE output for a genuinely broken host, exercising every rule |
-| `sample-healthy.xml` | a well-configured host. Anything reported against it beyond plain reachability is a false positive, and a test asserts so |
+## Project layout
 
-Script output in the XML fixtures encodes newlines as `&#10;`, the way nmap does,
-because a literal newline in an XML attribute is normalised to a space.
-
-## Recommended scan for best coverage
-
-```bash
-nmap -sV -sC --script "vuln,ssl-enum-ciphers,ssl-dh-params,ssh2-enum-algos,smb-security-mode,smb-protocols" -p- -oA target
+```
+nmap-vuln/
+├── nmapvuln.py            # run this
+├── nmapvuln/              # the package
+│   ├── cli.py             # command-line handling
+│   ├── parsers.py         # read nmap .xml / .nmap / .gnmap
+│   ├── match.py           # service → CVE matching
+│   ├── rules.py           # non-CVE weakness rules
+│   ├── sources.py         # NVD, Vulners, CISA KEV, EPSS
+│   ├── report.py          # the HTML/CSV/MD/JSON report
+│   ├── playbook.py        # per-port enumeration steps
+│   ├── knowledge.py       # loads the knowledge banks
+│   └── data/              # bundled knowledge banks (JSON)
+├── tools/                 # scripts to rebuild the knowledge banks
+├── tests/                 # test suite + sample scans
+└── README.md
 ```
 
-`-oA` writes all three formats; point nmapvuln at the directory and it will
-prefer the XML automatically.
+---
+
+## Authorisation & legal
+
+nmapvuln only reads scan files you already have; it does not connect to or attack
+anything. But scanning and testing networks you do not own or have **written
+permission** to test is illegal in most places. Only scan and test systems you
+own or are explicitly authorised to assess. You are responsible for how you use
+this tool and anything in its knowledge base.

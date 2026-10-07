@@ -1,0 +1,420 @@
+{
+ "note": "Network-wide attack methodology. Original content, methodology level. The tool prints this reference; it never executes any of it. Run only against systems you are authorised to test.",
+ "topics": [
+  {
+   "key": "sniffing-arp-spoofing",
+   "name": "Sniffing & ARP spoofing (MITM)",
+   "summary": "On a switched LAN, poison the ARP caches of a victim and the gateway so traffic routes through you, then read or alter it. The base layer-2 man-in-the-middle that most other LAN attacks build on.",
+   "applies_when": "You have a foothold on the same broadcast domain (a LAN port, a wireless client, a compromised host) and no dynamic ARP inspection is enforced.",
+   "rows": [
+    {
+     "technique": "Passive sniffing",
+     "tools": "tcpdump, Wireshark",
+     "command": "tcpdump -i eth0 -w capture.pcap",
+     "expect": "Cleartext credentials and tokens for any unencrypted protocol sharing the segment (FTP, HTTP, SNMP, LDAP simple bind).",
+     "mitigation": "Encrypt everything in transit; segment the network; use switch port security."
+    },
+    {
+     "technique": "ARP cache poisoning",
+     "tools": "bettercap, ettercap, arpspoof",
+     "command": "bettercap -iface eth0 -eval \"set arp.spoof.targets <victim>; arp.spoof on; net.sniff on\"",
+     "expect": "Victim and gateway send their traffic to you; you relay it and capture or modify it in flight.",
+     "mitigation": "Enable Dynamic ARP Inspection (DAI) with DHCP snooping; use static ARP for critical hosts."
+    },
+    {
+     "technique": "SSL/TLS downgrade in path",
+     "tools": "bettercap (hstshijack), sslstrip",
+     "command": "bettercap -iface eth0 -caplet hstshijack/hstshijack",
+     "expect": "Strips or downgrades TLS on victims that allow it, exposing session content.",
+     "mitigation": "Enforce HSTS with preload; pin certificates; HTTPS-only."
+    }
+   ],
+   "ref": "https://www.bettercap.org/"
+  },
+  {
+   "key": "llmnr-nbtns-mdns-relay",
+   "name": "LLMNR / NBT-NS / mDNS / WPAD poisoning & NTLM relay",
+   "summary": "Windows falls back to broadcast name resolution (LLMNR, NBT-NS, mDNS) and to WPAD proxy auto-discovery when DNS fails. Answer those broadcasts to capture NetNTLM hashes, or relay the authentication to another host for code execution without ever cracking it.",
+   "applies_when": "A Windows network where LLMNR/NBT-NS are still enabled and SMB signing is not required on at least some hosts.",
+   "rows": [
+    {
+     "technique": "Capture NetNTLM hashes",
+     "tools": "Responder",
+     "command": "responder -I eth0 -wv",
+     "expect": "NetNTLMv1/v2 hashes from hosts that mistype a share or hostname; crack offline with hashcat mode 5600.",
+     "mitigation": "Disable LLMNR (GPO) and NBT-NS; disable WPAD; require SMB signing."
+    },
+    {
+     "technique": "Relay instead of crack",
+     "tools": "impacket ntlmrelayx",
+     "command": "ntlmrelayx.py -tf targets.txt -smb2support",
+     "expect": "Authentication relayed to targets without SMB signing: command execution, SAM dump, or a session as the captured user.",
+     "mitigation": "Enforce SMB signing everywhere; enable EPA/channel binding on LDAP and HTTP."
+    },
+    {
+     "technique": "WPAD credential capture",
+     "tools": "Responder (-w), mitm6",
+     "command": "responder -I eth0 -wFv",
+     "expect": "Browsers requesting wpad.dat prompt for and leak domain credentials to a rogue proxy.",
+     "mitigation": "Create a real wpad DNS record (or disable auto-proxy); disable Web Proxy Auto-Discovery."
+    }
+   ],
+   "ref": "https://github.com/lgandx/Responder"
+  },
+  {
+   "key": "dhcpv6-ipv6-takeover",
+   "name": "DHCPv6 spoofing & IPv6 DNS takeover (mitm6)",
+   "summary": "Even IPv4-only networks usually leave IPv6 on. Answer the clients' DHCPv6 solicitations to assign yourself as their IPv6 DNS server, then route name resolution (and WPAD) through you — a reliable primary vector into Active Directory.",
+   "applies_when": "Windows clients with IPv6 enabled (the default) on a segment where no DHCPv6 guard is configured.",
+   "rows": [
+    {
+     "technique": "Become the IPv6 DNS server",
+     "tools": "mitm6",
+     "command": "mitm6 -d <domain.local> -i eth0",
+     "expect": "Clients accept you as their DNS server over IPv6 and send you their queries, including WPAD.",
+     "mitigation": "Enable RA Guard and DHCPv6 Guard on switches; disable IPv6 if genuinely unused; block rogue RAs."
+    },
+    {
+     "technique": "Chain to relay",
+     "tools": "mitm6 + ntlmrelayx",
+     "command": "ntlmrelayx.py -6 -t ldaps://<dc> -wh fakewpad.<domain> --delegate-access",
+     "expect": "Relayed LDAP authentication can create a computer account or grant delegation, leading to privilege escalation in AD.",
+     "mitigation": "Require LDAP channel binding and signing; restrict who can add computer accounts (ms-DS-MachineAccountQuota = 0)."
+    }
+   ],
+   "ref": "https://github.com/dirkjanm/mitm6"
+  },
+  {
+   "key": "pentesting-ipv6",
+   "name": "Pentesting IPv6",
+   "summary": "IPv6 is frequently unmonitored. Discover live IPv6 hosts via multicast and neighbour discovery, then scan them directly — they often expose the same services as IPv4 with none of the firewalling.",
+   "applies_when": "Any segment where IPv6 is active; especially dual-stack hosts whose IPv6 interface is less protected than IPv4.",
+   "rows": [
+    {
+     "technique": "Discover link-local hosts",
+     "tools": "THC-IPv6 (alive6), ping6",
+     "command": "alive6 eth0",
+     "expect": "A list of responding IPv6 hosts on the link, including ones with no IPv4 service exposed.",
+     "mitigation": "Apply equivalent firewall policy to IPv6; monitor ICMPv6; RA Guard."
+    },
+    {
+     "technique": "Enumerate neighbours",
+     "tools": "ip, ndisc6",
+     "command": "ip -6 neigh show dev eth0",
+     "expect": "Neighbour cache entries mapping IPv6 addresses to MACs for follow-up scanning.",
+     "mitigation": "Segment IPv6; restrict neighbour discovery; monitor NDP."
+    },
+    {
+     "technique": "Scan over IPv6",
+     "tools": "nmap",
+     "command": "nmap -6 -sV -p- <ipv6-address>",
+     "expect": "Open services on the IPv6 interface, often unfiltered compared to the IPv4 side of the same host.",
+     "mitigation": "Firewall IPv6 to parity with IPv4; disable unused IPv6."
+    }
+   ],
+   "ref": "https://github.com/vanhauser-thc/thc-ipv6"
+  },
+  {
+   "key": "vlan-hopping",
+   "name": "VLAN hopping / lateral segmentation bypass",
+   "summary": "Reach VLANs you were not placed in, either by negotiating a trunk with a switch that leaves DTP on (switch spoofing) or by double-tagging frames so the first tag is stripped and the second delivers you into another VLAN.",
+   "applies_when": "An access port with DTP enabled, or a native-VLAN misconfiguration that allows double-tagged frames to leak.",
+   "rows": [
+    {
+     "technique": "Switch spoofing (DTP)",
+     "tools": "yersinia, frogger",
+     "command": "yersinia -I   # enable trunking via DTP, then read 802.1Q tags",
+     "expect": "The port becomes a trunk and you receive traffic for every VLAN; create sub-interfaces per tag to reach them.",
+     "mitigation": "Disable DTP (switchport nonegotiate); set access ports to 'switchport mode access'."
+    },
+    {
+     "technique": "Double tagging",
+     "tools": "Scapy",
+     "command": "sendp(Ether()/Dot1Q(vlan=1)/Dot1Q(vlan=<target>)/IP(dst=...)/..., iface='eth0')",
+     "expect": "A one-way frame is delivered into the target VLAN when the native VLAN matches the outer tag.",
+     "mitigation": "Never use VLAN 1 as native; set a dedicated unused native VLAN; prune trunks."
+    }
+   ],
+   "ref": "https://github.com/nccgroup/vlan-hopping---frogger"
+  },
+  {
+   "key": "hsrp-glbp-attacks",
+   "name": "GLBP & HSRP (first-hop redundancy) attacks",
+   "summary": "HSRP, VRRP and GLBP elect a virtual default gateway by priority. If the election packets are unauthenticated (or use the well-known cleartext key), claim the highest priority to become the active gateway and route the segment's traffic through you.",
+   "applies_when": "You can see HSRP/VRRP/GLBP hellos on the segment and they carry no authentication or a default/cleartext key.",
+   "rows": [
+    {
+     "technique": "Observe the election",
+     "tools": "Wireshark, Loki",
+     "command": "wireshark -i eth0 -f 'proto 112 or udp port 1985 or udp port 3222'",
+     "expect": "Group, virtual IP, current priority and any authentication in the HSRP/VRRP/GLBP hellos.",
+     "mitigation": "Authenticate FHRP with a strong key; restrict which ports may source the protocol."
+    },
+    {
+     "technique": "Seize the active role",
+     "tools": "Loki, scapy",
+     "command": "loki_gtk.py   # send HSRP coup with priority 255",
+     "expect": "You become the active gateway; victims route through you, giving a full man-in-the-middle for the subnet.",
+     "mitigation": "Use the maximum priority on real routers plus MD5 auth; enable port security."
+    }
+   ],
+   "ref": "https://github.com/raizo62/loki_on_kali"
+  },
+  {
+   "key": "eigrp-attacks",
+   "name": "EIGRP attacks",
+   "summary": "EIGRP forms neighbour adjacencies and exchanges routes. Where it is unauthenticated, inject yourself as a neighbour to advertise bogus routes (blackhole or redirect traffic) or flood the process.",
+   "applies_when": "You observe EIGRP hellos (IP protocol 88, multicast 224.0.0.10) with no MD5/SHA authentication.",
+   "rows": [
+    {
+     "technique": "Discover EIGRP",
+     "tools": "Wireshark, tcpdump",
+     "command": "tcpdump -i eth0 -n proto 88",
+     "expect": "EIGRP hellos revealing the autonomous-system number and whether authentication is set.",
+     "mitigation": "Enable EIGRP authentication (key-chain); use passive-interface on access segments."
+    },
+    {
+     "technique": "Inject a route",
+     "tools": "Scapy, FRRouting",
+     "command": "# craft an EIGRP neighbour with Scapy and advertise a /0 route",
+     "expect": "Traffic for the advertised prefixes is pulled toward you — a redirect or blackhole.",
+     "mitigation": "Authenticate the routing protocol; filter routes; restrict adjacencies to known interfaces."
+    }
+   ],
+   "ref": "https://github.com/raizo62/loki_on_kali"
+  },
+  {
+   "key": "ids-ips-evasion",
+   "name": "IDS / IPS evasion",
+   "summary": "Signature and reassembly engines can be slipped with fragmentation, decoys, timing and source manipulation. Useful to confirm whether a negative scan result reflects a hardened host or a sensor dropping your probes.",
+   "applies_when": "A scan returns suspiciously little, or you need to test whether network sensors detect the assessment traffic.",
+   "rows": [
+    {
+     "technique": "Fragment probes",
+     "tools": "nmap",
+     "command": "nmap -f -p- <ip>",
+     "expect": "Fragmented packets that may pass sensors doing no reassembly.",
+     "mitigation": "Enforce full stream reassembly on the IPS; drop tiny fragments."
+    },
+    {
+     "technique": "Decoys and spoofed source",
+     "tools": "nmap",
+     "command": "nmap -D RND:10 -p- <ip>",
+     "expect": "Your real source address is hidden among decoys in the logs.",
+     "mitigation": "Correlate on behaviour, not single source IPs; rate-limit."
+    },
+    {
+     "technique": "Slow and randomise",
+     "tools": "nmap",
+     "command": "nmap -T1 --scan-delay 5s --randomize-hosts <range>",
+     "expect": "Probe rate below threshold-based detection windows.",
+     "mitigation": "Use long-baseline anomaly detection, not just short-window thresholds."
+    },
+    {
+     "technique": "Source-port trust",
+     "tools": "nmap",
+     "command": "nmap -sS -g 53 -p- <ip>",
+     "expect": "Probes sourced from a trusted port (53, 88) may bypass weak ACLs.",
+     "mitigation": "Do not trust source ports in firewall rules; use stateful policy."
+    }
+   ],
+   "ref": "https://nmap.org/book/man-bypass-firewalls-ids.html"
+  },
+  {
+   "key": "ssdp-upnp-evilssdp",
+   "name": "SSDP & UPnP spoofing (EvilSSDP)",
+   "summary": "Hosts discover services by multicasting SSDP searches. Answer them with a rogue device whose description points at an attacker page to phish credentials or deliver content, or abuse writable UPnP IGD rules.",
+   "applies_when": "SSDP (UDP 1900) is open on the segment and clients browse network devices.",
+   "rows": [
+    {
+     "technique": "Rogue SSDP device",
+     "tools": "evil-ssdp",
+     "command": "evil-ssdp eth0 -t <template>",
+     "expect": "Victims browsing network devices open your fake device page; a credential template harvests logins.",
+     "mitigation": "Disable UPnP/SSDP where not needed; filter multicast 1900; user awareness."
+    },
+    {
+     "technique": "Enumerate UPnP IGD",
+     "tools": "upnpc (miniupnpc)",
+     "command": "upnpc -l",
+     "expect": "The internet gateway's port-mapping table; writable mappings can expose internal hosts.",
+     "mitigation": "Disable UPnP IGD on gateways; restrict port-mapping to trusted clients."
+    }
+   ],
+   "ref": "https://github.com/initstring/evil-ssdp"
+  },
+  {
+   "key": "dds-rtps-impersonation",
+   "name": "DDS / RTPS service impersonation",
+   "summary": "DDS (Data Distribution Service) over RTPS is used in robotics, ROS 2 and industrial systems. Unauthenticated participants can be discovered and impersonated to read or publish topic data.",
+   "applies_when": "You find RTPS discovery traffic (default UDP 7400+) on an OT/robotics segment with DDS security disabled.",
+   "rows": [
+    {
+     "technique": "Discover participants",
+     "tools": "Wireshark, RustDDS/FastDDS tooling",
+     "command": "# capture RTPS discovery on UDP 7400-7500 and enumerate participants",
+     "expect": "The list of DDS participants, topics and data types on the bus.",
+     "mitigation": "Enable the DDS Security plugins (authentication, access control, encryption); segment OT networks."
+    },
+    {
+     "technique": "Impersonate a publisher",
+     "tools": "FastDDS / CycloneDDS APIs",
+     "command": "# join the domain and publish to a discovered topic",
+     "expect": "Injected data accepted by subscribers when no authentication is enforced.",
+     "mitigation": "Require mutual authentication and signed data; isolate the DDS domain."
+    },
+    {
+     "technique": "Exhaust discovery",
+     "tools": "custom RTPS flooder",
+     "command": "# flood PARTICIPANT/ENDPOINT discovery (SPDP/SEDP) on UDP 7400+",
+     "expect": "Subscribers spend resources on fake participants, degrading the bus.",
+     "mitigation": "Rate-limit discovery; isolate the DDS domain; enable the DDS Security access-control plugin."
+    }
+   ],
+   "ref": "https://www.omg.org/spec/DDS-SECURITY/"
+  },
+  {
+   "key": "telecom-exploitation",
+   "name": "Telecom network exploitation",
+   "summary": "Mobile core and interconnect protocols — GTP, SS7, Diameter, SIP — carry little inherent authentication. On a reachable core or roaming interface they allow subscriber tracking, interception and fraud. High-level reference; relevant only on telecom infrastructure.",
+   "applies_when": "The engagement scope includes a mobile core, a lab EPC, or an SS7/Diameter interconnect you are authorised to test.",
+   "rows": [
+    {
+     "technique": "Map the GTP control plane",
+     "tools": "GTPmap, Wireshark",
+     "command": "# probe GTP-C on UDP 2123 and enumerate reachable nodes",
+     "expect": "Reachable SGSN/GGSN/PGW endpoints and whether GTP is filtered at the edge.",
+     "mitigation": "Enforce GTP firewalling at borders (GRX/IPX); validate TEIDs; rate-limit."
+    },
+    {
+     "technique": "SS7/Diameter location & intercept",
+     "tools": "SigPloit (lab only)",
+     "command": "# issue MAP/Diameter queries against an authorised test core",
+     "expect": "Subscriber location or interception where the signalling link trusts the peer.",
+     "mitigation": "Deploy SS7/Diameter firewalls; apply GSMA FS.11/FS.19 category filtering; monitor for cross-category messages."
+    },
+    {
+     "technique": "SIP enumeration",
+     "tools": "sipvicious (svwar/svmap)",
+     "command": "svmap <range>   # then svwar to enumerate extensions",
+     "expect": "Reachable SIP devices and valid extensions for follow-up.",
+     "mitigation": "Authenticate SIP; restrict signalling to trusted peers; rate-limit REGISTER/INVITE."
+    }
+   ],
+   "ref": "https://github.com/SigPloiter/SigPloit"
+  },
+  {
+   "key": "webrtc-dos",
+   "name": "WebRTC DoS",
+   "summary": "WebRTC's STUN/TURN and media paths can be abused for amplification and resource exhaustion against clients or relays, or to reveal a target's real IP behind a proxy via ICE candidates.",
+   "applies_when": "A target application uses WebRTC (video/voice, conferencing) and you are assessing its availability or privacy exposure.",
+   "rows": [
+    {
+     "technique": "Leak real IP via ICE",
+     "tools": "browser, STUN query tools",
+     "command": "# collect ICE candidates from the offer/answer exchange",
+     "expect": "Host and server-reflexive candidates can reveal a client's real address behind a VPN or proxy.",
+     "mitigation": "Force relay-only ICE (TURN) for sensitive deployments; filter host candidates."
+    },
+    {
+     "technique": "TURN/STUN resource exhaustion",
+     "tools": "custom STUN flooder",
+     "command": "# flood allocation/binding requests at the TURN server",
+     "expect": "Degraded or exhausted relay capacity, denying service to legitimate sessions.",
+     "mitigation": "Authenticate TURN (long-term credentials); rate-limit allocations; quota per user."
+    },
+    {
+     "technique": "Signalling/SDP tampering",
+     "tools": "intercepting proxy",
+     "command": "# modify the SDP offer/answer in the signalling channel",
+     "expect": "Forced codec or candidate changes that break or redirect the media session.",
+     "mitigation": "Authenticate and integrity-protect signalling (DTLS-SRTP, secure WebSocket)."
+    }
+   ],
+   "ref": "https://datatracker.ietf.org/doc/html/rfc8826"
+  }
+ ],
+ "reference": [
+  {
+   "key": "nmap-summary",
+   "name": "Nmap summary (scan techniques)",
+   "summary": "A quick reference for the scan types the rest of this tool consumes, so a thin result can be read correctly.",
+   "applies_when": "Planning or interpreting the scan that feeds this report.",
+   "rows": [
+    {
+     "technique": "Host discovery",
+     "tools": "nmap",
+     "command": "nmap -sn <range>",
+     "expect": "Live hosts without a port scan (ping sweep).",
+     "mitigation": "n/a (reference)"
+    },
+    {
+     "technique": "Full TCP service scan",
+     "tools": "nmap",
+     "command": "nmap -sC -sV -p- -T4 <ip>",
+     "expect": "All TCP ports with version and default-script detail — the ideal input for this tool.",
+     "mitigation": "n/a (reference)"
+    },
+    {
+     "technique": "UDP scan",
+     "tools": "nmap",
+     "command": "nmap -sU --top-ports 100 <ip>",
+     "expect": "Common UDP services (SNMP, DNS, NTP, IKE) that a TCP-only scan misses.",
+     "mitigation": "n/a (reference)"
+    },
+    {
+     "technique": "Stealth / evasion",
+     "tools": "nmap",
+     "command": "nmap -sS -f -D RND:5 -T2 <ip>",
+     "expect": "SYN scan with fragmentation, decoys and slower timing.",
+     "mitigation": "n/a (reference)"
+    }
+   ],
+   "ref": "https://nmap.org/book/man.html"
+  },
+  {
+   "key": "network-protocols",
+   "name": "Network protocols explained",
+   "summary": "Short reference for the layer-2/3 protocols the attacks above target, so the technique and its fix make sense in context.",
+   "applies_when": "Background for the network-attack techniques.",
+   "rows": [
+    {
+     "technique": "ARP",
+     "tools": "n/a",
+     "command": "n/a",
+     "expect": "Maps IPv4 to MAC with no authentication — the basis of LAN MITM.",
+     "mitigation": "Dynamic ARP Inspection with DHCP snooping."
+    },
+    {
+     "technique": "NDP / ICMPv6",
+     "tools": "n/a",
+     "command": "n/a",
+     "expect": "IPv6's neighbour and router discovery; rogue RAs redirect traffic.",
+     "mitigation": "RA Guard, DHCPv6 Guard."
+    },
+    {
+     "technique": "LLMNR / NBT-NS / mDNS",
+     "tools": "n/a",
+     "command": "n/a",
+     "expect": "Broadcast name resolution fallbacks that leak NetNTLM hashes.",
+     "mitigation": "Disable via GPO; rely on DNS only."
+    },
+    {
+     "technique": "FHRP (HSRP/VRRP/GLBP)",
+     "tools": "n/a",
+     "command": "n/a",
+     "expect": "Elects a virtual gateway by priority; unauthenticated election enables gateway takeover.",
+     "mitigation": "Authenticate with a strong key; max priority on real routers."
+    },
+    {
+     "technique": "802.1Q",
+     "tools": "n/a",
+     "command": "n/a",
+     "expect": "VLAN tagging; DTP and native-VLAN misconfig enable VLAN hopping.",
+     "mitigation": "Disable DTP; dedicated unused native VLAN."
+    }
+   ],
+   "ref": "https://nmap.org/book/man.html"
+  }
+ ]
+}

@@ -7,7 +7,19 @@ import datetime
 import html
 import os
 
-from .model import Analysis, Finding
+from . import knowledge
+from .model import Analysis, Finding, Port, Service
+from .playbook import build as build_playbook
+
+
+def _kb_key_for(port_str, service_name) -> str:
+    """The Service-KB entry key for a port, for cross-linking. '' if none."""
+    try:
+        pid = int(str(port_str).split("/")[0])
+    except (ValueError, IndexError):
+        return ""
+    entry = knowledge.for_port(Port(portid=pid, service=Service(name=service_name or "")))
+    return entry["key"] if entry else ""
 
 SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"]
 
@@ -132,6 +144,161 @@ def write_validation_csv(analysis: Analysis, path: str) -> str:
     return path
 
 
+def _analysis_dict(analysis: Analysis) -> dict:
+    """The whole analysis as plain data, for JSON/Markdown export."""
+    inventory = []
+    for address, hostnames, host_ports in _merge_hosts(analysis):
+        for port in host_ports:
+            svc = port.service
+            inventory.append({
+                "host": address, "hostnames": hostnames, "port": port.key,
+                "service": svc.name, "product": svc.banner,
+                "detection": "probed" if svc.probed else "guessed", "conf": svc.conf,
+            })
+    return {
+        "tool": "nmapvuln",
+        "generated": datetime.datetime.now().isoformat(timespec="seconds"),
+        "summary": {
+            "scan_files": len(analysis.scans),
+            "live_hosts": sum(1 for h in analysis.hosts if h.status != "down"),
+            "findings": len(analysis.findings),
+            "weaknesses": len(analysis.weaknesses),
+            "severity_counts": analysis.combined_counts(),
+        },
+        "scans": [{"source": os.path.basename(s.source), "format": s.fmt,
+                   "nmap_version": s.nmap_version, "args": s.args,
+                   "completed": s.completed, "hosts": len(s.hosts)} for s in analysis.scans],
+        "issues": [{"severity": i.severity, "code": i.code, "scope": i.scope,
+                    "target": i.target, "message": i.message} for i in analysis.issues],
+        "findings": [{
+            "host": f.host, "hostnames": f.hostnames, "port": f.port, "service": f.service,
+            "product": f.product, "cve": f.cve, "cvss": f.cvss, "severity": f.severity,
+            "confidence": f.confidence, "source": f.source, "kev": f.kev, "kev_due": f.kev_due,
+            "epss": f.epss, "backport_suspected": f.backport_suspected,
+            "exploit_known": f.exploit_known, "published": f.published,
+            "matched_on": f.matched_on, "description": f.description,
+            "references": f.references, "scan_file": f.scan_file,
+        } for f in analysis.findings],
+        "weaknesses": [{
+            "host": w.host, "hostnames": w.hostnames, "port": w.port, "service": w.service,
+            "severity": w.severity, "confidence": w.confidence, "rule_id": w.rule_id,
+            "title": w.title, "category": w.category, "evidence": w.evidence,
+            "recommendation": w.recommendation, "source_script": w.source_script,
+            "scan_file": w.scan_file,
+        } for w in analysis.weaknesses],
+        "inventory": inventory,
+        "followup_scans": knowledge.followup_scan(analysis),
+        "suppressed": analysis.suppressed,
+    }
+
+
+def write_json(analysis: Analysis, path: str) -> str:
+    import json
+    os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(_analysis_dict(analysis), fh, ensure_ascii=False, indent=1)
+    return path
+
+
+def _md_table(headers: list[str], rows: list[list[str]]) -> str:
+    def esc(cell):
+        return " ".join(str(cell).split()).replace("|", "\\|")
+    out = ["| " + " | ".join(headers) + " |", "|" + "|".join(["---"] * len(headers)) + "|"]
+    for r in rows:
+        out.append("| " + " | ".join(esc(c) for c in r) + " |")
+    return "\n".join(out)
+
+
+def write_markdown(analysis: Analysis, path: str,
+                   title: str = "Nmap Scan Validation & CVE Report") -> str:
+    data = _analysis_dict(analysis)
+    s = data["summary"]
+    c = s["severity_counts"]
+    out = [f"# {title}", ""]
+    out.append(f"Generated {data['generated']} · {s['scan_files']} scan file(s) · "
+               f"{s['live_hosts']} live host(s) · {s['findings']} CVE finding(s) · "
+               f"{s['weaknesses']} non-CVE weakness(es)")
+    out.append("")
+    out.append(f"**Severity (combined):** {c['CRITICAL']} critical · {c['HIGH']} high · "
+               f"{c['MEDIUM']} medium · {c['LOW']} low")
+    out.append("")
+
+    if analysis.issues:
+        out += ["## Scan validation", ""]
+        out.append(_md_table(["Severity", "Code", "Scope", "Target", "Message"],
+                             [[i.severity, i.code, i.scope, i.target, i.message]
+                              for i in analysis.issues]))
+        out.append("")
+
+    out += ["## CVE findings", ""]
+    if analysis.findings:
+        out.append(_md_table(
+            ["Sev", "CVSS", "CVE", "KEV", "EPSS", "Host", "Port", "Service", "Conf"],
+            [[f.severity, "" if f.cvss is None else f"{f.cvss:.1f}", f.cve,
+              "yes" if f.kev else "", "" if f.epss is None else f"{f.epss*100:.1f}%",
+              f.host, f.port, f.product, f.confidence] for f in analysis.findings]))
+    else:
+        out.append("_No CVE findings._")
+    out.append("")
+
+    out += ["## Non-CVE weaknesses", ""]
+    if analysis.weaknesses:
+        out.append(_md_table(
+            ["Sev", "Conf", "Host", "Port", "Weakness", "Evidence"],
+            [[w.severity, w.confidence, w.host, w.port, w.title, w.evidence]
+             for w in analysis.weaknesses]))
+    else:
+        out.append("_No non-CVE weaknesses._")
+    out.append("")
+
+    if data["followup_scans"]:
+        out += ["## Suggested next scan", ""]
+        for run in data["followup_scans"]:
+            out.append(f"- **{run['label']}**")
+            out.append(f"  ```\n  {run['command']}\n  ```")
+        out.append("")
+
+    out += ["## Inventory", ""]
+    out.append(_md_table(["Host", "Hostnames", "Port", "Service", "Detection"],
+                         [[r["host"], ", ".join(r["hostnames"]), r["port"],
+                           r["product"], r["detection"]] for r in data["inventory"]]))
+    out.append("")
+
+    if analysis.suppressed:
+        out += ["## Withheld", ""]
+        for reason, n in sorted(analysis.suppressed.items(), key=lambda kv: -kv[1]):
+            out.append(f"- **{n}** {reason}")
+        out.append("")
+
+    os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(out))
+    return path
+
+
+def write_enumeration_csv(analysis: Analysis, path: str) -> str:
+    """One row per host/port/step, commands already filled in."""
+    os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(["host", "hostnames", "port", "service", "action", "command", "expect", "note"])
+        for entry in build_playbook(analysis.hosts):
+            for step in entry.steps:
+                writer.writerow(
+                    [
+                        entry.host,
+                        entry.hostnames,
+                        entry.port,
+                        entry.service,
+                        step.action,
+                        step.command,
+                        " ".join(step.expect.split()),
+                        " ".join(step.note.split()),
+                    ]
+                )
+    return path
+
+
 # --------------------------------------------------------------------------
 # HTML
 # --------------------------------------------------------------------------
@@ -206,6 +373,52 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:
 .note{font-size:13px;color:var(--muted)}
 .empty{color:var(--muted);font-style:italic;padding:8px 0}
 ul.tight{margin:6px 0;padding-left:20px} ul.tight li{margin:3px 0;font-size:13.5px}
+details.pb{border:1px solid var(--line);border-radius:7px;margin:7px 0;background:var(--panel)}
+details.pb summary{cursor:pointer;padding:9px 12px;font-size:14px}
+details.pb[open] summary{border-bottom:1px solid var(--line)}
+details.pb .tablewrap{padding:4px 10px 10px}
+details.pb code{white-space:pre-wrap;word-break:break-all}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:2px solid var(--line);
+  margin:18px 0 0;position:sticky;top:0;background:var(--bg);z-index:5;padding-top:6px}
+.tabs button{appearance:none;border:1px solid var(--line);border-bottom:none;
+  background:var(--chip);color:var(--muted);padding:8px 14px;font-size:13.5px;
+  border-radius:7px 7px 0 0;cursor:pointer;font-weight:600}
+.tabs button:hover{color:var(--ink)}
+.tabs button.active{background:var(--panel);color:var(--accent);
+  box-shadow:inset 0 -2px 0 var(--accent)}
+.tabs button .pill{display:inline-block;margin-left:6px;padding:0 6px;border-radius:9px;
+  background:var(--bg);color:var(--muted);font-size:11.5px;font-weight:600}
+.panel-tab{display:none;padding-top:14px} .panel-tab.active{display:block}
+.kb-intro{color:var(--muted);font-size:13.5px;margin:4px 0 10px}
+details.kb{border:1px solid var(--line);border-radius:7px;margin:7px 0;background:var(--panel)}
+details.kb>summary{cursor:pointer;padding:10px 12px;font-size:14px;font-weight:600}
+details.kb>summary .where{font-weight:400;color:var(--muted);font-size:12.5px}
+details.kb[open]>summary{border-bottom:1px solid var(--line)}
+.kb-body{padding:6px 10px 10px;overflow-x:auto}
+.phase-head{margin:10px 0 2px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--accent);font-weight:700}
+table.kb-tbl{width:100%;border-collapse:collapse;table-layout:fixed}
+table.kb-tbl td{vertical-align:top;padding:7px 8px;border-top:1px solid var(--line);
+  font-size:13px;overflow-wrap:anywhere}
+table.kb-tbl td.m{width:22%;font-weight:600}
+table.kb-tbl code{white-space:pre-wrap;overflow-wrap:anywhere;display:block;
+  background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:5px 7px;margin:2px 0}
+.kb-note{color:var(--muted)} .kb-note a{color:var(--accent)}
+.warnbar{border:1px solid var(--high);background:var(--high-bg);color:var(--high);
+  border-radius:7px;padding:9px 12px;font-size:13px;margin:6px 0 12px}
+.relbox{border:1px solid var(--accent);background:var(--chip);border-radius:7px;
+  padding:7px 10px;margin:4px 0 8px}
+.relbox>strong{color:var(--accent);font-size:12.5px}
+a.kblink{color:var(--accent);text-decoration:none;border-bottom:1px dotted var(--accent)}
+a.kblink:hover{text-decoration:none;border-bottom-style:solid}
+.tbar{display:flex;justify-content:flex-end;margin:4px 0}
+.expbtn,.copybtn{appearance:none;border:1px solid var(--line);background:var(--chip);
+  color:var(--muted);border-radius:6px;cursor:pointer;font-size:12px;padding:4px 10px}
+.expbtn:hover,.copybtn:hover{color:var(--accent);border-color:var(--accent)}
+.cmdwrap{position:relative}
+.copybtn{position:absolute;top:4px;right:4px;padding:2px 8px;font-size:11px;opacity:.75}
+.copybtn:hover{opacity:1}
+.copybtn.ok{color:var(--low);border-color:var(--low)}
 """
 
 JS = """
@@ -241,6 +454,83 @@ JS = """
     wcount.textContent=n+' of '+wrows.length+' weaknesses shown';
   }
   if(wq){[wq,wsev,wcat].forEach(function(el){el.addEventListener('input',wapply)}); wapply();}
+
+  var tabs=[].slice.call(document.querySelectorAll('.tabs button')),
+      panels=[].slice.call(document.querySelectorAll('.panel-tab'));
+  function show(id){
+    tabs.forEach(function(b){b.classList.toggle('active',b.dataset.tab===id);});
+    panels.forEach(function(p){p.classList.toggle('active',p.id===id);});
+    try{history.replaceState(null,'','#'+id);}catch(e){}
+  }
+  tabs.forEach(function(b){b.addEventListener('click',function(){show(b.dataset.tab);});});
+  var start=(location.hash||'').replace('#','');
+  show(tabs.some(function(b){return b.dataset.tab===start;})?start:(tabs[0]&&tabs[0].dataset.tab));
+
+  var kq=document.getElementById('kbq');
+  if(kq){
+    var blocks=[].slice.call(document.querySelectorAll('#tab-kb details.kb'));
+    kq.addEventListener('input',function(){
+      var t=(kq.value||'').toLowerCase();
+      blocks.forEach(function(d){
+        var hit=d.textContent.toLowerCase().indexOf(t)>-1;
+        d.style.display=hit?'':'none';
+        if(t&&hit){d.open=true;} if(!t){d.open=d.dataset.detected==='1';}
+      });
+    });
+  }
+
+  // Copy buttons on every command block.
+  function copyText(txt,btn){
+    function done(){var o=btn.textContent;btn.textContent='copied';btn.classList.add('ok');
+      setTimeout(function(){btn.textContent=o;btn.classList.remove('ok');},1200);}
+    try{navigator.clipboard.writeText(txt).then(done,function(){fallback();});}
+    catch(e){fallback();}
+    function fallback(){var ta=document.createElement('textarea');ta.value=txt;
+      document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done();}
+      catch(e){}document.body.removeChild(ta);}
+  }
+  [].slice.call(document.querySelectorAll('.kb-body code, details.pb code, #tab-overview .kb-tbl code'))
+    .forEach(function(code){
+      var wrap=document.createElement('span');wrap.className='cmdwrap';
+      code.parentNode.insertBefore(wrap,code);wrap.appendChild(code);
+      var btn=document.createElement('button');btn.className='copybtn';btn.textContent='copy';
+      btn.addEventListener('click',function(ev){ev.stopPropagation();copyText(code.textContent,btn);});
+      wrap.appendChild(btn);
+    });
+
+  // CSV export of a table (visible rows only, so filters apply).
+  function toCSV(table){
+    var out=[];
+    [].slice.call(table.querySelectorAll('tr')).forEach(function(tr){
+      if(tr.offsetParent===null && tr.parentNode.tagName==='TBODY'){return;}
+      var cells=[].slice.call(tr.querySelectorAll('th,td')).map(function(c){
+        var t=(c.innerText||'').replace(/\\s+/g,' ').trim();
+        return '"'+t.replace(/"/g,'""')+'"';
+      });
+      if(cells.length)out.push(cells.join(','));
+    });
+    return out.join('\\r\\n');
+  }
+  [].slice.call(document.querySelectorAll('.expbtn')).forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var table=document.getElementById(btn.dataset.table); if(!table)return;
+      var blob=new Blob(['\\ufeff'+toCSV(table)],{type:'text/csv;charset=utf-8;'});
+      var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+      a.download=btn.dataset.file||'export.csv';document.body.appendChild(a);a.click();
+      setTimeout(function(){URL.revokeObjectURL(a.href);document.body.removeChild(a);},100);
+    });
+  });
+
+  // Cross-link: a port in a findings/weakness row jumps to its Service-KB entry.
+  [].slice.call(document.querySelectorAll('a.kblink')).forEach(function(a){
+    a.addEventListener('click',function(ev){
+      ev.preventDefault();
+      var el=document.getElementById(a.dataset.kb); if(!el)return;
+      show('tab-kb'); el.open=true;
+      [].slice.call(document.querySelectorAll('#tab-kb details.kb')).forEach(function(d){d.style.display='';});
+      el.scrollIntoView({behavior:'smooth',block:'start'});
+    });
+  });
 })();
 """
 
@@ -248,6 +538,15 @@ JS = """
 def _sev_badge(sev: str) -> str:
     sev = sev if sev in SEVERITIES else "UNKNOWN"
     return f'<span class="badge b-{sev}">{sev}</span>'
+
+
+def _port_cell(port_str, service_name) -> str:
+    """A port label that links to its Service-KB entry when one exists."""
+    key = _kb_key_for(port_str, service_name)
+    if not key:
+        return _esc(port_str)
+    return (f'<a class="kblink" href="#kb-{_esc(key)}" data-kb="kb-{_esc(key)}" '
+            f'title="Jump to enumeration for this service">{_esc(port_str)}</a>')
 
 
 def _finding_row(f: Finding) -> str:
@@ -281,7 +580,7 @@ def _finding_row(f: Finding) -> str:
         f'<td class="nowrap">{cvss}</td>'
         f'<td class="nowrap">{nvd_link}{exploit}</td>'
         f'<td class="nowrap">{_esc(f.host)}<br><span class="tag">{_esc(f.hostnames) or "&nbsp;"}</span></td>'
-        f'<td class="nowrap">{_esc(f.port)}</td>'
+        f'<td class="nowrap">{_port_cell(f.port, f.service)}</td>'
         f"<td>{_esc(f.product)}</td>"
         f'<td class="nowrap"><span class="tag">{_esc(f.confidence)}</span> '
         f'<span class="tag">{_esc(f.source)}</span></td>'
@@ -298,7 +597,7 @@ def _weakness_rows(analysis: Analysis) -> str:
             f'<td class="nowrap">{_sev_badge(w.severity)}</td>'
             f'<td class="nowrap">{_esc(w.host)}<br>'
             f'<span class="tag">{_esc(w.hostnames) or "&nbsp;"}</span></td>'
-            f'<td class="nowrap">{_esc(w.port)}</td>'
+            f'<td class="nowrap">{_port_cell(w.port, w.service)}</td>'
             f"<td>{_esc(w.title)}<br>"
             f'<span class="tag">{_esc(w.rule_id)}</span> '
             f'<span class="tag">{_esc(w.confidence)}</span> '
@@ -344,6 +643,255 @@ def _issues_block(analysis: Analysis) -> str:
             f'<div class="tgt">{_esc(i.scope)}: {_esc(i.target)}</div></div></div>'
         )
     return "".join(out)
+
+
+def _playbook_block(analysis: Analysis) -> str:
+    """Per-port enumeration steps: what to run next, and what the output means.
+
+    Grouped under one host/port heading each, so the section reads as a
+    checklist rather than a wall of commands.
+    """
+    entries = build_playbook(analysis.hosts)
+    if not entries:
+        return '<div class="empty">No open ports to enumerate.</div>'
+
+    blocks = []
+    for entry in entries:
+        label = _esc(entry.host)
+        if entry.hostnames:
+            label += f' <span class="tag">{_esc(entry.hostnames)}</span>'
+        rows = []
+        for step in entry.steps:
+            note = f'<div class="tgt">{_esc(step.note)}</div>' if step.note else ""
+            rows.append(
+                f"<tr><td>{_esc(step.action)}</td>"
+                f'<td class="desc"><code>{_esc(step.command)}</code></td>'
+                f'<td class="desc">{_esc(step.expect)}{note}</td></tr>'
+            )
+        blocks.append(
+            f'<details class="pb"><summary><strong>{_esc(entry.port)}</strong> '
+            f"{_esc(entry.service)} &mdash; {label}</summary>"
+            '<div class="tablewrap"><table><thead><tr>'
+            "<th>Step</th><th>Command</th><th>What the output tells you</th>"
+            f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div></details>"
+        )
+    return "".join(blocks)
+
+
+def _kb_rows_table(rows: list[dict], subst: Optional[tuple[str, int]] = None) -> str:
+    """Render knowledge-bank technique rows, grouped under their phase headings."""
+    out = []
+    last_phase = None
+    for row in rows:
+        phase = row.get("phase") or ""
+        if phase != last_phase:
+            if last_phase is not None:
+                out.append("</tbody></table>")
+            heading = f'<div class="phase-head">{_esc(phase)}</div>' if phase else ""
+            out.append(heading + '<table class="kb-tbl"><tbody>')
+            last_phase = phase
+        method = _esc(row.get("method") or "")
+        command = row.get("command") or ""
+        if subst and command:
+            command = knowledge.substitute(command, subst[0], subst[1])
+        desc = row.get("command_desc") or row.get("description") or ""
+        remarks = row.get("remarks") or ""
+        reference = row.get("reference") or ""
+        cell = ""
+        if command:
+            cell += f"<code>{_esc(command)}</code>"
+        if desc:
+            cell += f"<div>{_esc(desc)}</div>"
+        if remarks:
+            cell += f'<div class="kb-note"><em>{_esc(remarks)}</em></div>'
+        if reference and reference.startswith("http"):
+            cell += (f'<div class="kb-note"><a href="{_esc(reference)}" target="_blank" '
+                     f'rel="noopener">reference</a></div>')
+        out.append(f'<tr><td class="m">{method or "&nbsp;"}</td><td>{cell}</td></tr>')
+    if last_phase is not None:
+        out.append("</tbody></table>")
+    return "".join(out)
+
+
+def _kb_block(analysis: Analysis) -> str:
+    """Per-service knowledge bank: detected services open and expanded, the rest
+    collapsed below them so the whole bank stays browsable."""
+    detected = knowledge.detected(analysis.hosts)
+    detected_keys = {e["key"] for e, _ in detected}
+    detected_where = {e["key"]: where for e, where in detected}
+
+    everything = knowledge.service_bank()
+    ordered = [e for e, _ in detected] + [e for e in everything if e["key"] not in detected_keys]
+    if not ordered:
+        return '<div class="empty">Knowledge bank is empty.</div>'
+
+    blocks = []
+    for entry in ordered:
+        is_det = entry["key"] in detected_keys
+        ports = ", ".join(str(p) for p in entry.get("ports", []))
+        where = ""
+        subst = None
+        if is_det:
+            seen = detected_where[entry["key"]]
+            where = f'<span class="where"> — detected on {_esc(", ".join(seen))}</span>'
+            ip, pid = seen[0].rsplit(":", 1)
+            subst = (ip, int(pid))
+        intro = f'<div class="kb-intro">{_esc(entry.get("intro") or "")}</div>' if entry.get("intro") else ""
+        blocks.append(
+            f'<details class="kb" id="kb-{_esc(entry["key"])}" '
+            f'data-detected="{"1" if is_det else "0"}"{" open" if is_det else ""}>'
+            f'<summary>{_esc(entry["name"])} '
+            f'<span class="where">[{_esc(ports)}]</span>{where}</summary>'
+            f'<div class="kb-body">{intro}{_kb_rows_table(entry["rows"], subst)}</div></details>'
+        )
+    return "".join(blocks)
+
+
+def _network_topic(topic: dict, reasons: Optional[list[str]] = None, is_open=False) -> str:
+    rows = []
+    for r in topic.get("rows", []):
+        cell = ""
+        if r.get("command"):
+            cell += f'<code>{_esc(r["command"])}</code>'
+        if r.get("expect"):
+            cell += f'<div>{_esc(r["expect"])}</div>'
+        if r.get("mitigation"):
+            cell += f'<div class="kb-note"><strong>Fix:</strong> {_esc(r["mitigation"])}</div>'
+        tool = _esc(r.get("tools") or "")
+        tech = _esc(r.get("technique") or "")
+        label = f"{tech}<br><span class='where'>{tool}</span>" if tool else tech
+        rows.append(f'<tr><td class="m">{label}</td><td>{cell}</td></tr>')
+
+    extra = ""
+    if reasons:
+        items = "".join(f"<li>{_esc(r)}</li>" for r in reasons)
+        extra += f'<div class="relbox"><strong>Why it is relevant here</strong><ul class="tight">{items}</ul></div>'
+    applies = topic.get("applies_when")
+    if applies:
+        extra += f'<div class="kb-note"><em>Applies when: {_esc(applies)}</em></div>'
+    ref = topic.get("ref")
+    if ref:
+        extra += (f'<div class="kb-note">Further reading: <a href="{_esc(ref)}" target="_blank" '
+                  f'rel="noopener">{_esc(ref)}</a></div>')
+    return (
+        f'<details class="kb"{" open" if is_open else ""}><summary>{_esc(topic["name"])}</summary>'
+        f'<div class="kb-body"><div class="kb-intro">{_esc(topic.get("summary") or "")}</div>'
+        f'{extra}<table class="kb-tbl"><tbody>{"".join(rows)}</tbody></table></div></details>'
+    )
+
+
+def _network_block(analysis: Analysis) -> str:
+    bank = knowledge.network_bank()
+    if not bank:
+        return '<div class="empty">Network knowledge bank is empty.</div>'
+
+    relevant, keys = knowledge.relevant_network_topics(analysis)
+    blocks = []
+
+    if relevant:
+        blocks.append('<h3>Relevant to this scan</h3>')
+        blocks.append('<p class="note">The scan found evidence that these are in reach. '
+                      'These are preconditions met, not confirmed attacks.</p>')
+        for topic, reasons in relevant:
+            blocks.append(_network_topic(topic, reasons=reasons, is_open=True))
+
+    rest = [t for t in bank.get("topics", []) if t["key"] not in keys]
+    blocks.append('<h3>General reference</h3>')
+    blocks.append('<p class="note">Network-wide techniques worth knowing on any engagement. '
+                  'Layer-2 and routing attacks (VLAN hopping, HSRP/GLBP/EIGRP) and IDS/IPS '
+                  'evasion are not derivable from a port scan, so they always live here.</p>')
+    for topic in rest:
+        blocks.append(_network_topic(topic))
+    for topic in bank.get("reference", []):
+        blocks.append(_network_topic(topic))
+    return "".join(blocks)
+
+
+def _methodology_block() -> str:
+    pages = knowledge.methodology()
+    if not pages:
+        return ""
+    blocks = ['<h3>General methodology</h3>']
+    for page in pages:
+        blocks.append(
+            f'<details class="kb"><summary>{_esc(page["name"])}</summary>'
+            f'<div class="kb-body">{_kb_rows_table(page["rows"])}</div></details>'
+        )
+    return "".join(blocks)
+
+
+def _followup_block(analysis: Analysis) -> str:
+    """The targeted next nmap run, derived from the services found."""
+    runs = knowledge.followup_scan(analysis)
+    if not runs:
+        return ""
+    rows = "".join(
+        f'<tr><td class="m">{_esc(r["label"])}</td>'
+        f'<td><code>{_esc(r["command"])}</code></td></tr>'
+        for r in runs
+    )
+    return (
+        "<h2>Suggested next scan</h2>"
+        '<p class="note">A deeper nmap run built from the services this scan already found — '
+        "the script set is chosen per host. Review before running, and only against systems "
+        "you are authorised to test.</p>"
+        f'<table class="kb-tbl"><tbody>{rows}</tbody></table>'
+    )
+
+
+def _triage_block(analysis: Analysis) -> str:
+    """Everything for one host in one place: findings, weaknesses, open ports, leads."""
+    rel_by_host: dict[str, list[str]] = {}
+    relevant, _ = knowledge.relevant_network_topics(analysis)
+
+    # Group hosts (union across scan files), reusing the inventory merge.
+    merged = _merge_hosts(analysis)
+    if not merged:
+        return '<div class="empty">No live hosts with open ports.</div>'
+
+    findings_by_host: dict[str, list[Finding]] = {}
+    for f in analysis.findings:
+        findings_by_host.setdefault(f.host, []).append(f)
+    weak_by_host: dict[str, list] = {}
+    for w in analysis.weaknesses:
+        weak_by_host.setdefault(w.host, []).append(w)
+
+    blocks = []
+    for address, hostnames, host_ports in merged:
+        n_f = len(findings_by_host.get(address, []))
+        n_w = len(weak_by_host.get(address, []))
+        names = f' <span class="where">{_esc(", ".join(hostnames))}</span>' if hostnames else ""
+
+        # Open ports with KB links.
+        port_bits = []
+        for port in host_ports:
+            cell = _port_cell(port.key, port.service.name)
+            port_bits.append(f"<li>{cell} — {_esc(port.service.banner)}</li>")
+        ports_html = f'<strong>Open ports</strong><ul class="tight">{"".join(port_bits)}</ul>' if port_bits else ""
+
+        # Findings and weaknesses, compact.
+        fw = []
+        for f in sorted(findings_by_host.get(address, []), key=lambda x: x.sort_key)[:12]:
+            fw.append(f'<li>{_sev_badge(f.severity)} {_esc(f.cve)} on {_esc(f.port)}</li>')
+        for w in sorted(weak_by_host.get(address, []), key=lambda x: x.sort_key)[:12]:
+            fw.append(f'<li>{_sev_badge(w.severity)} {_esc(w.title)} ({_esc(w.port)})</li>')
+        fw_html = f'<strong>Findings &amp; weaknesses</strong><ul class="tight">{"".join(fw)}</ul>' if fw else ""
+
+        # Network leads that name this host.
+        leads = []
+        for topic, reasons in relevant:
+            hits = [r for r in reasons if address in r]
+            if hits:
+                leads.append(f'<li><strong>{_esc(topic["name"])}</strong>: {_esc(hits[0])}</li>')
+        leads_html = f'<strong>Network leads</strong><ul class="tight">{"".join(leads)}</ul>' if leads else ""
+
+        open_attr = " open" if (n_f or n_w) else ""
+        blocks.append(
+            f'<details class="kb"{open_attr}><summary>{_esc(address)}{names} '
+            f'<span class="where">{len(host_ports)} ports · {n_f} CVE · {n_w} weakness</span>'
+            f'</summary><div class="kb-body">{ports_html}{fw_html}{leads_html}</div></details>'
+        )
+    return "".join(blocks)
 
 
 def _merge_hosts(analysis: Analysis) -> list[tuple[str, list[str], list]]:
@@ -420,7 +968,7 @@ def _inventory_block(analysis: Analysis) -> str:
     if not rows:
         return '<div class="empty">No live hosts with open ports.</div>'
     return (
-        '<div class="tablewrap"><table><thead><tr>'
+        '<div class="tablewrap"><table id="inventory"><thead><tr>'
         "<th>Host</th><th>Hostnames</th><th>Port</th><th>Service</th>"
         "<th>Detection</th><th>Findings</th>"
         "</tr></thead><tbody>" + "".join(rows) + "</tbody></table></div>"
@@ -446,7 +994,12 @@ def _scans_block(analysis: Analysis) -> str:
     )
 
 
-def write_html(analysis: Analysis, path: str, title: str = "Nmap Scan Validation & CVE Report") -> str:
+def write_html(
+    analysis: Analysis,
+    path: str,
+    title: str = "Nmap Scan Validation & CVE Report",
+    include_playbook: bool = True,
+) -> str:
     counts = analysis.combined_counts()
     cve_counts = analysis.counts_by_severity()
     weak_counts = analysis.weakness_counts_by_severity()
@@ -483,9 +1036,43 @@ def write_html(analysis: Analysis, path: str, title: str = "Nmap Scan Validation
 
     withheld_block = _suppressed_block(analysis)
     weakness_rows = _weakness_rows(analysis)
+
     categories = "".join(
         f'<option value="{_esc(c)}">{_esc(c)}</option>'
         for c in sorted({w.category for w in analysis.weaknesses if w.category})
+    )
+
+    # Tab pill counts.
+    n_cve = len(analysis.findings)
+    n_weak = len(analysis.weaknesses)
+    n_enum = len(build_playbook(analysis.hosts)) if include_playbook else 0
+    n_kb = len(knowledge.detected(analysis.hosts))
+    n_net = len(knowledge.network_bank().get("topics", []))
+
+    def tab_btn(tab_id: str, label: str, pill=None) -> str:
+        p = f' <span class="pill">{pill}</span>' if pill is not None else ""
+        return f'<button data-tab="{tab_id}">{label}{p}</button>'
+
+    enum_tab = ""
+    if include_playbook:
+        enum_tab = (
+            '<div class="panel-tab" id="tab-enum">'
+            "<h2>Enumeration playbook (manual next steps)</h2>"
+            '<div class="warnbar">Reconnaissance commands you run yourself — the tool does '
+            "not run them. Only run them against systems you are authorised to test.</div>"
+            f"{_playbook_block(analysis)}"
+            "</div>"
+        )
+
+    tabs = (
+        tab_btn("tab-overview", "Overview")
+        + tab_btn("tab-cve", "CVE Findings", n_cve)
+        + tab_btn("tab-weak", "Weaknesses", n_weak)
+        + (tab_btn("tab-enum", "Enumeration", n_enum) if include_playbook else "")
+        + tab_btn("tab-kb", "Service KB", n_kb)
+        + tab_btn("tab-net", "Network Attacks", n_net)
+        + tab_btn("tab-host", "Per-host", len(live))
+        + tab_btn("tab-inv", "Inventory")
     )
 
     body = f"""
@@ -503,98 +1090,132 @@ def write_html(analysis: Analysis, path: str, title: str = "Nmap Scan Validation
     <div class="card"><div class="n">{errors}</div><div class="l">Scan errors</div></div>
     <div class="card"><div class="n">{warns}</div><div class="l">Scan warnings</div></div>
   </div>
-  <p class="note">Totals combine {len(analysis.findings)} CVE finding(s) and
-     {len(analysis.weaknesses)} non-CVE weakness(es).
-     CVE: {cve_counts['CRITICAL']}C/{cve_counts['HIGH']}H/{cve_counts['MEDIUM']}M/{cve_counts['LOW']}L ·
-     non-CVE: {weak_counts['CRITICAL']}C/{weak_counts['HIGH']}H/{weak_counts['MEDIUM']}M/{weak_counts['LOW']}L</p>
 
-  <h2>Scan validation</h2>
-  <p class="note">Whether the scans themselves are trustworthy. Coverage gaps here limit
-     what the findings below can prove — an absent finding is only as strong as the scan
-     that looked for it.</p>
-  <div class="panel">{_issues_block(analysis)}</div>
+  <div class="tabs">{tabs}</div>
 
-  <h3>Scan files</h3>
-  {_scans_block(analysis)}
+  <div class="panel-tab" id="tab-overview">
+    <p class="note">Totals combine {len(analysis.findings)} CVE finding(s) and
+       {len(analysis.weaknesses)} non-CVE weakness(es).
+       CVE: {cve_counts['CRITICAL']}C/{cve_counts['HIGH']}H/{cve_counts['MEDIUM']}M/{cve_counts['LOW']}L ·
+       non-CVE: {weak_counts['CRITICAL']}C/{weak_counts['HIGH']}H/{weak_counts['MEDIUM']}M/{weak_counts['LOW']}L</p>
 
-  <h2>CVE findings (version-matched)</h2>
-  <p class="note">Confidence reflects how the match was made:
-     <strong>high</strong> = nmap-supplied CPE with a version, range-matched by NVD;
-     <strong>medium</strong> = version probed but CPE synthesised or keyword matched;
-     <strong>low</strong> = no version, product-level match only.
-     Everything here is a <em>potential</em> match derived from a banner — confirm before
-     reporting.</p>
-  <div class="controls">
-    <input id="q" type="search" placeholder="Filter by host, CVE, product…">
-    <select id="sev">
-      <option value="all">All severities</option>
-      <option value="CRITICAL">Critical</option>
-      <option value="HIGH">High</option>
-      <option value="MEDIUM">Medium</option>
-      <option value="LOW">Low</option>
-      <option value="UNKNOWN">Unknown</option>
-    </select>
-    <select id="conf">
-      <option value="all">All confidence</option>
-      <option value="high">High confidence</option>
-      <option value="medium">Medium confidence</option>
-      <option value="low">Low confidence</option>
-    </select>
+    <h2>Scan validation</h2>
+    <p class="note">Whether the scans themselves are trustworthy. Coverage gaps here limit
+       what the findings can prove — an absent finding is only as strong as the scan
+       that looked for it.</p>
+    <div class="panel">{_issues_block(analysis)}</div>
+
+    <h3>Scan files</h3>
+    {_scans_block(analysis)}
+    {skipped}
+    {withheld_block}
+
+    {_followup_block(analysis)}
+
+    <h2>Method &amp; limitations</h2>
+    <div class="panel"><ul class="tight">
+      <li><strong>CVE findings</strong> are derived from <strong>service banners</strong>.
+          Banners can be wrong, stale, deliberately altered, or backported — a matched CVE
+          is a lead to verify, not a confirmed vulnerability.</li>
+      <li><strong>Non-CVE weaknesses</strong> are derived from what the scan actually
+          observed (negotiated ciphers, DH moduli, certificate fields, script results), so
+          they do not share the banner-accuracy problem.</li>
+      <li>Backported security fixes are the most common false positive: distributions patch
+          vulnerabilities without changing the advertised version string.</li>
+      <li>Ports outside the scanned range, and services behind filtering, are untested rather
+          than proven safe.</li>
+      <li>No exploitation or active verification was performed by this tool; it only reads
+          existing scan output.</li>
+    </ul></div>
   </div>
-  <p class="note" id="count"></p>
-  <div class="tablewrap"><table id="findings"><thead><tr>
-    <th class="nowrap">Severity</th><th class="nowrap">CVSS</th><th>CVE</th><th>Host</th>
-    <th>Port</th><th>Service</th><th>Match</th><th>Description</th>
-  </tr></thead><tbody>{rows}</tbody></table></div>
 
-  <h2>Configuration &amp; weak-crypto findings (non-CVE)</h2>
-  <p class="note">Weaknesses that carry no CVE — weak Diffie-Hellman groups and cipher
-     suites, missing SMB signing, anonymous access, expired certificates, cleartext and
-     exposed services. These come from what the scan <em>observed</em> rather than from a
-     version match, so they do not depend on banner accuracy and are generally the more
-     directly reportable half of this report.</p>
-  <div class="controls">
-    <input id="wq" type="search" placeholder="Filter by host, rule, service…">
-    <select id="wsev">
-      <option value="all">All severities</option>
-      <option value="CRITICAL">Critical</option>
-      <option value="HIGH">High</option>
-      <option value="MEDIUM">Medium</option>
-      <option value="LOW">Low</option>
-    </select>
-    <select id="wcat">
-      <option value="all">All categories</option>
-      {categories}
-    </select>
+  <div class="panel-tab" id="tab-cve">
+    <h2>CVE findings (version-matched)</h2>
+    <p class="note">Confidence reflects how the match was made:
+       <strong>high</strong> = nmap-supplied CPE with a version, range-matched by NVD;
+       <strong>medium</strong> = version probed but CPE synthesised or keyword matched;
+       <strong>low</strong> = no version, product-level match only.
+       Everything here is a <em>potential</em> match derived from a banner — confirm before
+       reporting.</p>
+    <div class="controls">
+      <input id="q" type="search" placeholder="Filter by host, CVE, product…">
+      <select id="sev">
+        <option value="all">All severities</option>
+        <option value="CRITICAL">Critical</option><option value="HIGH">High</option>
+        <option value="MEDIUM">Medium</option><option value="LOW">Low</option>
+        <option value="UNKNOWN">Unknown</option>
+      </select>
+      <select id="conf">
+        <option value="all">All confidence</option>
+        <option value="high">High confidence</option>
+        <option value="medium">Medium confidence</option>
+        <option value="low">Low confidence</option>
+      </select>
+    </div>
+    <p class="note" id="count"></p>
+    <div class="tbar"><button class="expbtn" data-table="findings" data-file="findings.csv">⬇ Export CSV</button></div>
+    <div class="tablewrap"><table id="findings"><thead><tr>
+      <th class="nowrap">Severity</th><th class="nowrap">CVSS</th><th>CVE</th><th>Host</th>
+      <th>Port</th><th>Service</th><th>Match</th><th>Description</th>
+    </tr></thead><tbody>{rows}</tbody></table></div>
   </div>
-  <p class="note" id="wcount"></p>
-  <div class="tablewrap"><table id="weaknesses"><thead><tr>
-    <th class="nowrap">Severity</th><th>Host</th><th>Port</th><th>Weakness</th>
-    <th>Evidence</th><th>Recommendation</th>
-  </tr></thead><tbody>{weakness_rows}</tbody></table></div>
 
-  <h2>Host &amp; service inventory</h2>
-  {_inventory_block(analysis)}
+  <div class="panel-tab" id="tab-weak">
+    <h2>Configuration &amp; weak-crypto findings (non-CVE)</h2>
+    <p class="note">Weaknesses that carry no CVE — weak Diffie-Hellman groups and cipher
+       suites, missing SMB signing, anonymous access, expired certificates, cleartext and
+       exposed services. These come from what the scan <em>observed</em> rather than from a
+       version match, so they do not depend on banner accuracy.</p>
+    <div class="controls">
+      <input id="wq" type="search" placeholder="Filter by host, rule, service…">
+      <select id="wsev">
+        <option value="all">All severities</option>
+        <option value="CRITICAL">Critical</option><option value="HIGH">High</option>
+        <option value="MEDIUM">Medium</option><option value="LOW">Low</option>
+      </select>
+      <select id="wcat"><option value="all">All categories</option>{categories}</select>
+    </div>
+    <p class="note" id="wcount"></p>
+    <div class="tbar"><button class="expbtn" data-table="weaknesses" data-file="weaknesses.csv">⬇ Export CSV</button></div>
+    <div class="tablewrap"><table id="weaknesses"><thead><tr>
+      <th class="nowrap">Severity</th><th>Host</th><th>Port</th><th>Weakness</th>
+      <th>Evidence</th><th>Recommendation</th>
+    </tr></thead><tbody>{weakness_rows}</tbody></table></div>
+  </div>
 
-  {skipped}
-  {withheld_block}
+  {enum_tab}
 
-  <h2>Method &amp; limitations</h2>
-  <div class="panel"><ul class="tight">
-    <li><strong>CVE findings</strong> are derived from <strong>service banners</strong>.
-        Banners can be wrong, stale, deliberately altered, or backported — a matched CVE
-        is a lead to verify, not a confirmed vulnerability.</li>
-    <li><strong>Non-CVE weaknesses</strong> are derived from what the scan actually
-        observed (negotiated ciphers, DH moduli, certificate fields, script results), so
-        they do not share the banner-accuracy problem. Where a rule reads a script's own
-        conclusion, it inherits that script's reliability.</li>
-    <li>Backported security fixes are the most common false positive: distributions patch
-        vulnerabilities without changing the advertised version string.</li>
-    <li>Ports outside the scanned range, and services behind filtering, are untested rather
-        than proven safe.</li>
-    <li>No exploitation or active verification was performed by this tool; it only reads
-        existing scan output.</li>
-  </ul></div>
+  <div class="panel-tab" id="tab-kb">
+    <h2>Service knowledge base</h2>
+    <p class="note">Per-service enumeration and exploitation methodology. Services found in
+       this scan are expanded first (commands filled in for the detected host); the rest of
+       the bank is below, collapsed. <strong>Authorised testing only.</strong></p>
+    <div class="controls"><input id="kbq" type="search" placeholder="Filter the knowledge base…"></div>
+    {_kb_block(analysis)}
+  </div>
+
+  <div class="panel-tab" id="tab-net">
+    <h2>Network-layer attacks</h2>
+    <div class="warnbar">Network-wide techniques (spoofing, IPv6 takeover, VLAN hopping,
+      routing and first-hop-redundancy attacks). Methodology reference — the tool runs none
+      of it. Only against systems you are authorised to test.</div>
+    {_network_block(analysis)}
+    {_methodology_block()}
+  </div>
+
+  <div class="panel-tab" id="tab-host">
+    <h2>Per-host triage</h2>
+    <p class="note">Everything the scan knows about each host in one place — open ports
+       (each links to its enumeration), findings, weaknesses, and the network leads that
+       name this host. Hosts with findings are expanded.</p>
+    {_triage_block(analysis)}
+  </div>
+
+  <div class="panel-tab" id="tab-inv">
+    <h2>Host &amp; service inventory</h2>
+    <div class="tbar"><button class="expbtn" data-table="inventory" data-file="inventory.csv">⬇ Export CSV</button></div>
+    {_inventory_block(analysis)}
+  </div>
 </div>
 <script>{JS}</script>
 """

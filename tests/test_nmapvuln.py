@@ -963,5 +963,290 @@ class TestFlagCombinations(unittest.TestCase):
         self.assertNotEqual(caught.exception.code, 0)
 
 
+from nmapvuln import knowledge, playbook  # noqa: E402
+from nmapvuln.report import write_enumeration_csv, write_html  # noqa: E402
+
+
+class TestKnowledgeBank(unittest.TestCase):
+    """The shipped service and network knowledge banks, and port matching."""
+
+    def test_service_bank_loads(self):
+        bank = knowledge.service_bank()
+        self.assertGreater(len(bank), 20)
+        for entry in bank:
+            self.assertTrue(entry["name"])
+            self.assertIn("rows", entry)
+
+    def test_network_bank_loads(self):
+        net = knowledge.network_bank()
+        self.assertTrue(net.get("topics"))
+        names = " ".join(t["name"] for t in net["topics"]).lower()
+        for expected in ("llmnr", "ipv6", "vlan", "hsrp"):
+            self.assertIn(expected, names)
+
+    def test_match_by_port_number(self):
+        port = Port(portid=22, state="open", service=Service(name="ssh", method="probed"))
+        entry = knowledge.for_port(port)
+        self.assertIsNotNone(entry)
+        self.assertIn(22, entry["ports"])
+
+    def test_match_by_service_alias_when_port_unusual(self):
+        # SMB on a non-standard port still resolves via the nmap service name.
+        port = Port(portid=10445, state="open",
+                    service=Service(name="microsoft-ds", method="probed"))
+        entry = knowledge.for_port(port)
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry["name"], "SMB")
+
+    def test_unknown_port_returns_none(self):
+        port = Port(portid=12399, state="open", service=Service(name="zzz", method="probed"))
+        self.assertIsNone(knowledge.for_port(port))
+
+    def test_phase_is_forward_filled(self):
+        ssh = knowledge.for_port(
+            Port(portid=22, state="open", service=Service(name="ssh")))
+        self.assertTrue(all(r["phase"] for r in ssh["rows"]))
+
+    def test_substitute_fills_host_and_port(self):
+        out = knowledge.substitute("nmap -p <port> <IP>", "10.0.0.9", 22)
+        self.assertEqual(out, "nmap -p 22 10.0.0.9")
+
+    def test_detected_maps_open_ports(self):
+        host = Host(address="10.0.0.5", status="up")
+        host.ports.append(Port(portid=22, state="open",
+                               service=Service(name="ssh", method="probed")))
+        host.ports.append(Port(portid=53, state="open",
+                               service=Service(name="domain", method="probed")))
+        det = knowledge.detected([host])
+        names = {e["name"] for e, _ in det}
+        self.assertEqual(names, {"SSH", "DNS"})
+        where = dict((e["name"], w) for e, w in det)
+        self.assertEqual(where["SSH"], ["10.0.0.5:22"])
+
+
+class TestReportTabs(unittest.TestCase):
+    def _html(self, sample, **kw):
+        analysis = Analysis()
+        analysis.scans.extend(parse_file(os.path.join(SAMPLES, sample)))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_html(analysis, os.path.join(tmp, "r.html"), **kw)
+            return open(path, encoding="utf-8").read()
+
+    def test_all_tabs_present(self):
+        html = self._html("sample-scripts.xml")
+        for tab in ("tab-overview", "tab-cve", "tab-weak", "tab-enum",
+                    "tab-kb", "tab-net", "tab-inv"):
+            self.assertIn(f'id="{tab}"', html)
+        self.assertIn('class="tabs"', html)
+
+    def test_detected_service_kb_is_substituted(self):
+        # The scripts sample opens SSH on 10.10.10.20; a KB command should carry it.
+        html = self._html("sample-scripts.xml")
+        self.assertIn("Service knowledge base", html)
+        self.assertIn("10.10.10.20", html)
+
+    def test_network_attacks_rendered(self):
+        html = self._html("sample.xml")
+        self.assertIn("Network-layer attacks", html)
+        self.assertIn("mitm6", html)
+        self.assertIn("Responder", html)
+
+    def test_enum_tab_can_be_disabled(self):
+        html = self._html("sample.xml", include_playbook=False)
+        self.assertNotIn('id="tab-enum"', html)
+        # The service KB tab is independent and stays.
+        self.assertIn('id="tab-kb"', html)
+
+    def test_per_host_tab_and_followup(self):
+        html = self._html("sample-scripts.xml")
+        self.assertIn('id="tab-host"', html)
+        self.assertIn("Suggested next scan", html)
+        self.assertIn("deep", html)  # followup command names the deep scan output
+
+    def test_ports_cross_link_to_kb(self):
+        # A finding on an SSH/HTTP port should render a kblink to the KB entry.
+        html = self._html("sample.xml")
+        self.assertIn('class="kblink"', html)
+        self.assertIn("data-kb=", html)
+
+    def test_export_and_copy_affordances_present(self):
+        html = self._html("sample.xml")
+        self.assertIn('class="expbtn"', html)
+        self.assertIn('data-table="inventory"', html)
+        self.assertIn("copybtn", html)  # JS creates copy buttons
+
+    def test_network_tab_is_scan_aware(self):
+        html = self._html("sample-scripts.xml")
+        self.assertIn("Relevant to this scan", html)
+        self.assertIn("General reference", html)
+        self.assertIn("Further reading", html)  # per-topic reference links
+
+
+class TestScanAware(unittest.TestCase):
+    def _analysis(self, sample):
+        a = Analysis()
+        a.scans.extend(parse_file(os.path.join(SAMPLES, sample)))
+        a.weaknesses = detect(a.scans)
+        return a
+
+    def test_cleartext_surfaces_sniffing(self):
+        a = self._analysis("sample-scripts.xml")  # telnet, ftp, http present
+        rel, keys = knowledge.relevant_network_topics(a)
+        self.assertIn("sniffing-arp-spoofing", keys)
+
+    def test_l2_routing_topics_never_surface(self):
+        # VLAN hopping / HSRP / EIGRP / IDS evasion are invisible to a port scan.
+        a = self._analysis("sample-scripts.xml")
+        _, keys = knowledge.relevant_network_topics(a)
+        for invisible in ("vlan-hopping", "hsrp-glbp-attacks", "eigrp-attacks", "ids-ips-evasion"):
+            self.assertNotIn(invisible, keys)
+
+    def test_followup_scan_uses_detected_scripts(self):
+        a = self._analysis("sample-scripts.xml")
+        runs = knowledge.followup_scan(a)
+        self.assertTrue(runs)
+        joined = " ".join(r["command"] for r in runs)
+        self.assertIn("--script", joined)
+        self.assertIn("ssh2-enum-algos", joined)  # SSH was open
+
+
+class TestExports(unittest.TestCase):
+    def test_json_export_shape(self):
+        import json as _json
+        from nmapvuln.report import write_json
+
+        a = Analysis(offline=True)
+        a.scans.extend(parse_file(os.path.join(SAMPLES, "sample.xml")))
+        a.weaknesses = detect(a.scans)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_json(a, os.path.join(tmp, "r.json"))
+            data = _json.load(open(path, encoding="utf-8"))
+        for key in ("summary", "findings", "weaknesses", "inventory", "followup_scans"):
+            self.assertIn(key, data)
+        self.assertEqual(data["summary"]["weaknesses"], len(a.weaknesses))
+
+    def test_markdown_export(self):
+        from nmapvuln.report import write_markdown
+
+        a = Analysis(offline=True)
+        a.scans.extend(parse_file(os.path.join(SAMPLES, "sample-scripts.xml")))
+        a.weaknesses = detect(a.scans)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_markdown(a, os.path.join(tmp, "r.md"))
+            body = open(path, encoding="utf-8").read()
+        self.assertIn("# Nmap Scan", body)
+        self.assertIn("## Non-CVE weaknesses", body)
+        self.assertIn("| Sev |", body)
+
+
+class TestPlaybook(unittest.TestCase):
+    """The enumeration playbook: right steps per service, commands filled in."""
+
+    def _port(self, name, portid=0, tunnel="", product="", version="", method="probed"):
+        return Port(
+            portid=portid or 80,
+            state="open",
+            service=Service(name=name, tunnel=tunnel, product=product,
+                            version=version, method=method),
+        )
+
+    def test_http_gets_web_enumeration(self):
+        steps = playbook.steps_for(self._port("http", 80))
+        cmds = " ".join(s.command for s in steps)
+        self.assertIn("whatweb", cmds)
+        self.assertIn("nikto", cmds)
+        self.assertIn("http-enum", cmds)
+
+    def test_tls_service_gets_tls_steps(self):
+        steps = playbook.steps_for(self._port("https", 443, tunnel="ssl"))
+        cmds = " ".join(s.command for s in steps)
+        self.assertIn("sslscan", cmds)
+        self.assertIn("s_client", cmds)
+
+    def test_https_web_steps_use_https_scheme(self):
+        steps = playbook.steps_for(self._port("https", 443, tunnel="ssl"))
+        web = [s for s in steps if "whatweb" in s.command][0]
+        self.assertIn("https://", web.command)
+        self.assertNotIn("http://", web.command)
+
+    def test_plain_http_keeps_http_scheme(self):
+        steps = playbook.steps_for(self._port("http", 80))
+        web = [s for s in steps if "whatweb" in s.command][0]
+        self.assertIn("http://", web.command)
+        self.assertNotIn("https://", web.command)
+
+    def test_tunnelled_service_is_treated_as_tls(self):
+        # nmap reports FTPS as name="ftp" tunnel="ssl"; TLS steps must still apply.
+        steps = playbook.steps_for(self._port("ftp", 990, tunnel="ssl"))
+        self.assertTrue(any("sslscan" in s.command for s in steps))
+
+    def test_smb_alias_resolves(self):
+        steps = playbook.steps_for(self._port("microsoft-ds", 445))
+        self.assertTrue(any("smbclient" in s.command for s in steps))
+
+    def test_rdp_alias_resolves(self):
+        steps = playbook.steps_for(self._port("ms-wbt-server", 3389))
+        self.assertTrue(any("rdp-enum-encryption" in s.command for s in steps))
+
+    def test_version_yields_exploit_lookup(self):
+        steps = playbook.steps_for(
+            self._port("ssh", 22, product="OpenSSH", version="7.4"))
+        exploit = [s for s in steps if "searchsploit" in s.command]
+        self.assertEqual(len(exploit), 1)
+        self.assertIn("OpenSSH 7.4", exploit[0].command)
+
+    def test_no_version_no_exploit_lookup(self):
+        steps = playbook.steps_for(self._port("ssh", 22))
+        self.assertFalse(any("searchsploit" in s.command for s in steps))
+
+    def test_unknown_service_still_gets_reprobe(self):
+        steps = playbook.steps_for(self._port("cslistener", 9000))
+        self.assertTrue(steps)
+        self.assertIn("nmap -sV -sC", steps[0].command)
+
+    def test_commands_have_host_and_port_substituted(self):
+        host = Host(address="10.0.0.9", status="up", hostnames=["h"])
+        host.ports.append(self._port("http", 8080))
+        entries = playbook.build([host])
+        self.assertEqual(len(entries), 1)
+        for step in entries[0].steps:
+            self.assertNotIn("{ip}", step.command)
+            self.assertNotIn("{port}", step.command)
+        joined = " ".join(s.command for s in entries[0].steps)
+        self.assertIn("10.0.0.9", joined)
+        self.assertIn("8080", joined)
+
+    def test_down_hosts_and_tcpwrapped_are_skipped(self):
+        down = Host(address="1.1.1.1", status="down")
+        down.ports.append(self._port("http", 80))
+        wrapped = Host(address="2.2.2.2", status="up")
+        wrapped.ports.append(self._port("tcpwrapped", 8080))
+        self.assertEqual(playbook.build([down, wrapped]), [])
+
+    def test_enumeration_csv_is_written(self):
+        analysis = Analysis()
+        analysis.scans.extend(parse_file(os.path.join(SAMPLES, "sample.xml")))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_enumeration_csv(analysis, os.path.join(tmp, "enum.csv"))
+            with open(path, encoding="utf-8") as fh:
+                body = fh.read()
+        self.assertIn("whatweb", body)        # http port present
+        self.assertIn("10.10.10.5", body)     # host substituted
+        self.assertNotIn("8080", body.split("\n", 1)[1] if "\n" in body else "")  # tcpwrapped skipped
+
+    def test_html_playbook_section_toggles(self):
+        analysis = Analysis()
+        analysis.scans.extend(parse_file(os.path.join(SAMPLES, "sample.xml")))
+        with tempfile.TemporaryDirectory() as tmp:
+            on = write_html(analysis, os.path.join(tmp, "a.html"), include_playbook=True)
+            off = write_html(analysis, os.path.join(tmp, "b.html"), include_playbook=False)
+            with open(on, encoding="utf-8") as fh:
+                with_pb = fh.read()
+            with open(off, encoding="utf-8") as fh:
+                without_pb = fh.read()
+        self.assertIn("Enumeration playbook", with_pb)
+        self.assertNotIn("Enumeration playbook", without_pb)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

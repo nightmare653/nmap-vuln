@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<nmaprun scanner="nmap" args="nmap -sV -sC -p- -oX healthy.xml 10.20.30.40" start="1704067200" startstr="Mon Jan  1 00:00:00 2024" version="7.94" xmloutputversion="1.05">
+  <host starttime="1704067200" endtime="1704067400">
+    <status state="up" reason="echo-reply" reason_ttl="64"/>
+    <address addr="10.20.30.40" addrtype="ipv4"/>
+    <hostnames><hostname name="www.example.com" type="PTR"/></hostnames>
+    <ports>
+      <extraports state="closed" count="65527"><extrareasons reason="resets" count="65527"/></extraports>
+      <port protocol="tcp" portid="22">
+        <state state="open" reason="syn-ack" reason_ttl="64"/>
+        <service name="ssh" product="OpenSSH" version="9.6" extrainfo="protocol 2.0" method="probed" conf="10"/>
+        <script id="ssh2-enum-algos" output="&#10;kex_algorithms: (5)&#10;    curve25519-sha256&#10;    curve25519-sha256@libssh.org&#10;    ecdh-sha2-nistp256&#10;    diffie-hellman-group-exchange-sha256&#10;    diffie-hellman-group16-sha512&#10;server_host_key_algorithms: (3)&#10;    rsa-sha2-512&#10;    rsa-sha2-256&#10;    ssh-ed25519&#10;encryption_algorithms: (4)&#10;    chacha20-poly1305@openssh.com&#10;    aes128-ctr&#10;    aes256-gcm@openssh.com&#10;    aes128-gcm@openssh.com&#10;mac_algorithms: (4)&#10;    umac-64-etm@openssh.com&#10;    umac-128-etm@openssh.com&#10;    hmac-sha2-256-etm@openssh.com&#10;    hmac-sha2-512-etm@openssh.com&#10;compression_algorithms: (2)&#10;    none&#10;    zlib@openssh.com&#10;"/>
+        <script id="ssh-hostkey" output="&#10;256 aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99 (ECDSA)&#10;256 11:22:33:44:55:66:77:88:99:aa:bb:cc:dd:ee:ff:00 (ED25519)&#10;3072 ab:cd:ef:01:23:45:67:89:ab:cd:ef:01:23:45:67:89 (RSA)&#10;"/>
+      </port>
+      <port protocol="tcp" portid="443">
+        <state state="open" reason="syn-ack" reason_ttl="64"/>
+        <service name="https" product="nginx" version="1.24.0" tunnel="ssl" method="probed" conf="10"/>
+        <script id="ssl-enum-ciphers" output="&#10;TLSv1.2:&#10;  ciphers:&#10;    TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 (secp256r1) - A&#10;    TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256 (secp256r1) - A&#10;  compressors:&#10;    NULL&#10;  cipher preference: server&#10;TLSv1.3:&#10;  ciphers:&#10;    TLS_AKE_WITH_AES_256_GCM_SHA384 (ecdh_x25519) - A&#10;    TLS_AKE_WITH_CHACHA20_POLY1305_SHA256 (ecdh_x25519) - A&#10;  cipher preference: server&#10;least strength: A&#10;"/>
+        <script id="ssl-cert" output="&#10;Subject: commonName=www.example.com&#10;Subject Alternative Name: DNS:www.example.com, DNS:example.com&#10;Issuer: commonName=R3/organizationName=Let's Encrypt/countryName=US&#10;Public Key type: ec&#10;Public Key bits: 256&#10;Signature Algorithm: ecdsa-with-SHA256&#10;Not valid before: 2023-11-01T00:00:00&#10;Not valid after:  2033-01-30T00:00:00&#10;MD5:   1a2b 3c4d 5e6f 7081 9200 a1b2 c3d4 e5f6&#10;SHA-1: 0011 2233 4455 6677 8899 aabb ccdd eeff 0011 2233&#10;"/>
+        <script id="http-methods" output="&#10;Supported Methods: GET HEAD POST OPTIONS&#10;"/>
+      </port>
+      <port protocol="tcp" portid="3389">
+        <state state="open" reason="syn-ack" reason_ttl="64"/>
+        <service name="ms-wbt-server" product="Microsoft Terminal Services" method="probed" conf="10"/>
+        <script id="rdp-enum-encryption" output="&#10;Security layer&#10;  CredSSP (NLA): SUCCESS&#10;  CredSSP with Early User Auth: FAILED&#10;  Native RDP: FAILED&#10;  SSL: FAILED&#10;RDP Encryption level: High&#10;"/>
+      </port>
+      <port protocol="tcp" portid="27017">
+        <state state="open" reason="syn-ack" reason_ttl="64"/>
+        <service name="mongodb" product="MongoDB" version="6.0.13" method="probed" conf="10"/>
+        <script id="mongodb-databases" output="&#10;ERROR: not authorized on admin to execute command { listDatabases: 1.0 }&#10;"/>
+      </port>
+      <port protocol="tcp" portid="6379">
+        <state state="open" reason="syn-ack" reason_ttl="64"/>
+        <service name="redis" product="Redis key-value store" version="7.2.4" method="probed" conf="10"/>
+        <script id="redis-info" output="&#10;ERROR: NOAUTH Authentication required.&#10;"/>
+      </port>
+      <port protocol="tcp" portid="8081">
+        <state state="open" reason="syn-ack" reason_ttl="64"/>
+        <service name="mysql" method="table" conf="3"/>
+      </port>
+    </ports>
+    <hostscript>
+      <script id="smb-security-mode" output="&#10;account_used: &lt;blank&gt;&#10;authentication_level: user&#10;challenge_response: supported&#10;message_signing: required&#10;"/>
+      <script id="smb-protocols" output="&#10;dialects:&#10;  2.0.2&#10;  2.1&#10;  3.0&#10;  3.0.2&#10;  3.1.1&#10;"/>
+    </hostscript>
+  </host>
+  <runstats>
+    <finished time="1704067400" timestr="Mon Jan  1 00:03:20 2024" elapsed="200.00" exit="success"/>
+    <hosts up="1" down="0" total="1"/>
+  </runstats>
+</nmaprun>

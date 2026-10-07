@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<nmaprun scanner="nmap" args="nmap -sV -sC -p 22,25,80,3306,8080 -oX sample.xml 10.10.10.5 10.10.10.6" start="1704067200" startstr="Mon Jan  1 00:00:00 2024" version="7.94" xmloutputversion="1.05">
+  <scaninfo type="syn" protocol="tcp" numservices="5" services="22,25,80,3306,8080"/>
+  <verbose level="0"/>
+  <debugging level="0"/>
+  <host starttime="1704067200" endtime="1704067210">
+    <status state="up" reason="echo-reply" reason_ttl="63"/>
+    <address addr="10.10.10.5" addrtype="ipv4"/>
+    <hostnames>
+      <hostname name="web01.lab.local" type="PTR"/>
+    </hostnames>
+    <ports>
+      <extraports state="closed" count="0">
+        <extrareasons reason="resets" count="0"/>
+      </extraports>
+      <port protocol="tcp" portid="22">
+        <state state="open" reason="syn-ack" reason_ttl="63"/>
+        <service name="ssh" product="OpenSSH" version="7.4" extrainfo="protocol 2.0" method="probed" conf="10">
+          <cpe>cpe:/a:openbsd:openssh:7.4</cpe>
+        </service>
+      </port>
+      <port protocol="tcp" portid="25">
+        <state state="open" reason="syn-ack" reason_ttl="63"/>
+        <service name="smtp" product="Postfix smtpd" method="probed" conf="10"/>
+      </port>
+      <port protocol="tcp" portid="80">
+        <state state="open" reason="syn-ack" reason_ttl="63"/>
+        <service name="http" product="Apache httpd" version="2.4.49" extrainfo="(Unix)" method="probed" conf="10">
+          <cpe>cpe:/a:apache:http_server:2.4.49</cpe>
+        </service>
+        <script id="vulners" output="&#10;cpe:/a:apache:http_server:2.4.49:&#10;  CVE-2021-42013  9.8  https://vulners.com/cve/CVE-2021-42013&#10;  CVE-2021-41773  7.5  https://vulners.com/cve/CVE-2021-41773&#10;"/>
+        <script id="http-server-header" output="&#10;Apache/2.4.49 (Unix) Server at web01.lab.local Port 80&#10;"/>
+      </port>
+      <port protocol="tcp" portid="3306">
+        <state state="open" reason="syn-ack" reason_ttl="63"/>
+        <service name="mysql" product="MySQL" method="probed" conf="10"/>
+      </port>
+      <port protocol="tcp" portid="8080">
+        <state state="open" reason="syn-ack" reason_ttl="63"/>
+        <service name="tcpwrapped" method="probed" conf="8"/>
+      </port>
+    </ports>
+    <times srtt="1000" rttvar="500" to="100000"/>
+  </host>
+  <host starttime="1704067210" endtime="1704067260">
+    <status state="up" reason="user-set" reason_ttl="0"/>
+    <address addr="10.10.10.6" addrtype="ipv4"/>
+    <hostnames/>
+    <ports>
+      <extraports state="filtered" count="65535">
+        <extrareasons reason="no-responses" count="65535"/>
+      </extraports>
+    </ports>
+    <times srtt="2000" rttvar="900" to="100000"/>
+  </host>
+  <runstats>
+    <finished time="1704067260" timestr="Mon Jan  1 00:01:00 2024" summary="Nmap done" elapsed="60.00" exit="success"/>
+    <hosts up="2" down="0" total="2"/>
+  </runstats>
+</nmaprun>

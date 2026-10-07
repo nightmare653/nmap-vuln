@@ -1,0 +1,6 @@
+# Nmap 7.94 scan initiated Mon Jan  1 01:00:00 2024 as: nmap -sV -T5 -oG sample.gnmap 10.10.10.5 10.10.10.6
+Host: 10.10.10.5 (web01.lab.local)	Status: Up
+Host: 10.10.10.5 (web01.lab.local)	Ports: 22/open/tcp//ssh//OpenSSH 7.4 (protocol 2.0)/, 80/open/tcp//http//Apache httpd 2.4.49/, 443/filtered/tcp//https///	Ignored State: closed (997)
+Host: 10.10.10.6 ()	Status: Up
+Host: 10.10.10.6 ()	Ports: 22/open/tcp//ssh///	Ignored State: filtered (999)
+# Nmap done at Mon Jan  1 01:00:30 2024 -- 2 IP addresses (2 hosts up) scanned in 30.00 seconds

@@ -1,0 +1,19 @@
+Starting Nmap 7.94 ( https://nmap.org ) at 2024-01-01 02:00 UTC
+Nmap scan report for db01.lab.local (10.10.10.11)
+Host is up (0.00089s latency).
+Not shown: 995 closed tcp ports (reset)
+PORT     STATE SERVICE    VERSION
+22/tcp   open  ssh        OpenSSH 8.2p1 Ubuntu 4ubuntu0.5 (Ubuntu Linux; protocol 2.0)
+5432/tcp open  postgresql PostgreSQL DB 11.7
+| ssl-cert: Subject: commonName=db01.lab.local
+| Public Key type: rsa
+| Public Key bits: 2048
+| Signature Algorithm: sha256WithRSAEncryption
+| Not valid before: 2023-06-01T00:00:00
+|_Not valid after:  2033-06-01T00:00:00
+
+Nmap scan report for 10.10.10.12
+Host is up (0.0012s latency).
+Not shown: 1000 filtered tcp ports (no-response)
+
+Nmap done: 2 IP addresses (2 hosts up) scanned in 4.21 seconds

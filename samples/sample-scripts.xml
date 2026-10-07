@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<nmaprun scanner="nmap" args="nmap -sV -sC --script vuln,ssl-enum-ciphers,ssl-dh-params,ssh2-enum-algos,smb-security-mode,smb-protocols -p- -oX sample-scripts.xml 10.10.10.20" start="1704067200" startstr="Mon Jan  1 00:00:00 2024" version="7.94" xmloutputversion="1.05">
+  <scaninfo type="syn" protocol="tcp" numservices="65535" services="1-65535"/>
+  <host starttime="1704067200" endtime="1704067400">
+    <status state="up" reason="echo-reply" reason_ttl="64"/>
+    <address addr="10.10.10.20" addrtype="ipv4"/>
+    <hostnames>
+      <hostname name="legacy.lab.local" type="PTR"/>
+    </hostnames>
+    <ports>
+      <extraports state="closed" count="65525">
+        <extrareasons reason="resets" count="65525"/>
+      </extraports>
+      <port protocol="tcp" portid="21">
+        <state state="open" reason="syn-ack" reason_ttl="64"/>
+        <service name="ftp" product="vsftpd" version="2.3.4" method="probed" conf="10">
+          <cpe>cpe:/a:beasts:vsftpd:2.3.4</cpe>
+        </service>
+        <script id="ftp-anon" output="&#10;Anonymous FTP login allowed (FTP code 230)&#10;drwxrwxrwx    2 0        0            4096 Jan 01 00:00 incoming&#10;-rw-r--r--    1 0        0             219 Jan 01 00:00 readme.txt&#10;"/>
+      </port>
+      <port protocol="tcp" portid="22">
+        <state state="open" reason="syn-ack" reason_ttl="64"/>
+        <service name="ssh" product="OpenSSH" version="5.3" extrainfo="protocol 2.0" method="probed" conf="10"/>
+        <script id="ssh2-enum-algos" output="&#10;kex_algorithms: (4)&#10;    curve25519-sha256@libssh.org&#10;    diffie-hellman-group-exchange-sha256&#10;    diffie-hellman-group1-sha1&#10;    ecdh-sha2-nistp256&#10;server_host_key_algorithms: (2)&#10;    ssh-rsa&#10;    ssh-dss&#10;encryption_algorithms: (4)&#10;    aes128-ctr&#10;    aes256-ctr&#10;    aes128-cbc&#10;    arcfour256&#10;mac_algorithms: (4)&#10;    hmac-sha2-256&#10;    umac-64-etm@openssh.com&#10;    hmac-md5&#10;    hmac-sha1-96&#10;compression_algorithms: (2)&#10;    none&#10;    zlib@openssh.com&#10;"/>
+        <script id="ssh-hostkey" output="&#10;1024 aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99 (RSA)&#10;1024 11:22:33:44:55:66:77:88:99:aa:bb:cc:dd:ee:ff:00 (DSA)&#10;256 ab:cd:ef:01:23:45:67:89:ab:cd:ef:01:23:45:67:89 (ED25519)&#10;"/>
+      </port>
+      <port protocol="tcp" portid="23">
+        <state state="open" reason="syn-ack" reason_ttl="64"/>
+        <service name="telnet" product="Linux telnetd" method="probed" conf="10"/>
+      </port>
+      <port protocol="tcp" portid="53">
+        <state state="open" reason="syn-ack" reason_ttl="64"/>
+        <service name="domain" product="ISC BIND" version="9.8.2" method="probed" conf="10"/>
+        <script id="dns-recursion" output="&#10;Recursion appears to be enabled&#10;"/>
+      </port>
+      <port protocol="tcp" portid="80">
+        <state state="open" reason="syn-ack" reason_ttl="64"/>
+        <service name="http" product="Apache httpd" version="2.2.15" method="probed" conf="10"/>
+        <script id="http-methods" output="&#10;Supported Methods: GET HEAD POST OPTIONS PUT DELETE TRACE&#10;Potentially risky methods: PUT DELETE TRACE&#10;"/>
+      </port>
+      <port protocol="tcp" portid="443">
+        <state state="open" reason="syn-ack" reason_ttl="64"/>
+        <service name="https" product="Apache httpd" version="2.2.15" tunnel="ssl" method="probed" conf="10"/>
+        <script id="ssl-dh-params" output="&#10;VULNERABLE:&#10;Diffie-Hellman Key Exchange Insufficient Group Strength&#10;  State: VULNERABLE&#10;    Transport Layer Security (TLS) services that use Diffie-Hellman groups of&#10;    insufficient strength, especially those using one of a few commonly shared&#10;    groups, may be susceptible to passive eavesdropping attacks.&#10;    Check results:&#10;      WEAK DH GROUP 1&#10;            Cipher Suite: TLS_DHE_RSA_WITH_AES_128_CBC_SHA&#10;            Modulus Type: Safe prime&#10;            Modulus Source: Unknown/Custom-generated&#10;            Modulus Length: 1024&#10;            Generator Length: 8&#10;            Public Key Length: 1024&#10;  References:&#10;    https://weakdh.org&#10;"/>
+        <script id="ssl-enum-ciphers" output="&#10;SSLv3:&#10;  ciphers:&#10;    TLS_RSA_WITH_RC4_128_SHA (rsa 2048) - C&#10;    TLS_RSA_WITH_3DES_EDE_CBC_SHA (rsa 2048) - C&#10;  compressors:&#10;    NULL&#10;  cipher preference: server&#10;TLSv1.0:&#10;  ciphers:&#10;    TLS_RSA_EXPORT_WITH_RC4_40_MD5 (rsa 2048) - E&#10;    TLS_DHE_RSA_WITH_AES_128_CBC_SHA (dh 1024) - C&#10;  compressors:&#10;    NULL&#10;  cipher preference: server&#10;TLSv1.2:&#10;  ciphers:&#10;    TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 (secp256r1) - A&#10;  compressors:&#10;    NULL&#10;  cipher preference: server&#10;least strength: E&#10;"/>
+        <script id="ssl-cert" output="&#10;Subject: commonName=old.lab.local/organizationName=Lab/countryName=GB&#10;Issuer: commonName=old.lab.local/organizationName=Lab/countryName=GB&#10;Public Key type: rsa&#10;Public Key bits: 1024&#10;Signature Algorithm: sha1WithRSAEncryption&#10;Not valid before: 2014-01-01T00:00:00&#10;Not valid after:  2016-01-01T00:00:00&#10;MD5:   1111 2222 3333 4444 5555 6666 7777 8888&#10;SHA-1: aaaa bbbb cccc dddd eeee ffff 0000 1111 2222 3333&#10;"/>
+        <script id="ssl-heartbleed" output="&#10;VULNERABLE:&#10;The Heartbleed Bug is a serious vulnerability in the popular OpenSSL&#10;cryptographic software library. It allows for stealing information intended&#10;to be protected by SSL/TLS encryption.&#10;  State: VULNERABLE&#10;  Risk factor: High&#10;  References:&#10;    https://www.openssl.org/news/secadv_20140407.txt&#10;"/>
+      </port>
+      <port protocol="tcp" portid="3306">
+        <state state="open" reason="syn-ack" reason_ttl="64"/>
+        <service name="mysql" product="MySQL" version="5.5.40" method="probed" conf="10"/>
+        <script id="mysql-empty-password" output="&#10;root account has empty password&#10;"/>
+      </port>
+      <port protocol="tcp" portid="6379">
+        <state state="open" reason="syn-ack" reason_ttl="64"/>
+        <service name="redis" product="Redis key-value store" version="5.0.7" method="probed" conf="10"/>
+        <script id="redis-info" output="&#10;Version: 5.0.7&#10;redis_version: 5.0.7&#10;redis_mode: standalone&#10;os: Linux 5.4.0-generic x86_64&#10;tcp_port: 6379&#10;"/>
+      </port>
+    </ports>
+    <hostscript>
+      <script id="smb-security-mode" output="&#10;account_used: guest&#10;authentication_level: user&#10;challenge_response: supported&#10;message_signing: disabled (dangerous, but default)&#10;"/>
+      <script id="smb-protocols" output="&#10;dialects:&#10;  NT LM 0.12 (SMBv1) [dangerous, but default]&#10;  2.0.2&#10;  2.1&#10;"/>
+    </hostscript>
+    <times srtt="1000" rttvar="500" to="100000"/>
+  </host>
+  <runstats>
+    <finished time="1704067400" timestr="Mon Jan  1 00:03:20 2024" summary="Nmap done" elapsed="200.00" exit="success"/>
+    <hosts up="1" down="0" total="1"/>
+  </runstats>
+</nmaprun>
