@@ -385,10 +385,20 @@ The report includes reference material to help you act on findings:
 
 - **Enumeration playbook** — per open port, the standard commands to confirm a
   finding, with host and port filled in.
-- **Service KB** — a deep per-service knowledge bank (33 services) organised by
-  phase (enumeration → exploitation), built from a spreadsheet.
+- **Service KB** — a deep per-service knowledge bank organised by phase
+  (enumeration → exploitation). Each service merges two sources: a curated
+  spreadsheet bank, and commands extracted from **HackTricks** (clearly labelled
+  and attributed). Services found in your scan are expanded first with the host
+  filled in; the rest are searchable, with Expand-all / Collapse-all.
 - **Network Attacks** — network-wide techniques, with a scan-aware "Relevant to
   this scan" group that explains *why* each one applies to your target.
+
+> [!NOTE]
+> The HackTricks commands come from
+> [HackTricks](https://github.com/carlospolop/hacktricks) by Carlos Polop,
+> licensed **CC BY-NC 4.0**. That licence is **non-commercial** — see
+> [CREDITS.md](CREDITS.md) for the attribution and what it means for using this
+> tool commercially.
 
 > [!WARNING]
 > This material is **methodology reference**. The tool never runs any of it —
@@ -404,7 +414,7 @@ The report includes reference material to help you act on findings:
 python tests/test_nmapvuln.py
 ```
 
-147 tests covering the parsers, CVE matching, the weakness rules, the knowledge
+153 tests covering the parsers, CVE matching, the weakness rules, the knowledge
 banks, the exports, and one regression test for every false positive the tool has
 ever produced. No test touches the network. Test fixtures live in `samples/` and
 can be rebuilt with `python tests/make_samples.py`.
@@ -440,3 +450,7 @@ anything. But scanning and testing networks you do not own or have **written
 permission** to test is illegal in most places. Only scan and test systems you
 own or are explicitly authorised to assess. You are responsible for how you use
 this tool and anything in its knowledge base.
+
+**Third-party content.** The "HackTricks commands" in the Service KB are from
+HackTricks (Carlos Polop), licensed CC BY-NC 4.0 (non-commercial). See
+[CREDITS.md](CREDITS.md) for attribution and the commercial-use caveat.

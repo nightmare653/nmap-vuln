@@ -1011,6 +1011,32 @@ class TestKnowledgeBank(unittest.TestCase):
         out = knowledge.substitute("nmap -p <port> <IP>", "10.0.0.9", 22)
         self.assertEqual(out, "nmap -p 22 10.0.0.9")
 
+    def test_substitute_handles_curly_placeholders(self):
+        self.assertEqual(knowledge.substitute("x {IP}:{PORT}", "10.0.0.9", 22), "x 10.0.0.9:22")
+
+    def test_hacktricks_bank_loads_and_is_attributed(self):
+        bank = knowledge.hacktricks_bank()
+        self.assertGreater(len(bank.get("services", [])), 20)
+        self.assertEqual(bank.get("license"), "CC BY-NC 4.0")
+        self.assertIn("carlospolop", bank.get("attribution", "").lower())
+
+    def test_hacktricks_match_by_port(self):
+        entry = knowledge.hacktricks_for_port(
+            Port(portid=6379, state="open", service=Service(name="redis")))
+        self.assertIsNotNone(entry)
+        self.assertTrue(entry["sections"])
+
+    def test_merged_cards_combine_both_sources(self):
+        host = Host(address="10.0.0.5", status="up")
+        host.ports.append(Port(portid=6379, state="open",
+                               service=Service(name="redis", method="probed")))
+        cards = knowledge.merged_service_cards([host])
+        detected = [c for c in cards if c["detected"]]
+        self.assertEqual(len(detected), 1)
+        self.assertTrue(detected[0]["xlsx"])   # team spreadsheet has Redis
+        self.assertTrue(detected[0]["ht"])     # HackTricks has Redis
+        self.assertEqual(detected[0]["where"], ["10.0.0.5:6379"])
+
     def test_detected_maps_open_ports(self):
         host = Host(address="10.0.0.5", status="up")
         host.ports.append(Port(portid=22, state="open",
@@ -1080,6 +1106,17 @@ class TestReportTabs(unittest.TestCase):
         self.assertIn("Relevant to this scan", html)
         self.assertIn("General reference", html)
         self.assertIn("Further reading", html)  # per-topic reference links
+
+    def test_hacktricks_rendered_with_attribution(self):
+        html = self._html("sample-scripts.xml")
+        self.assertIn("HackTricks commands", html)
+        self.assertIn("CC BY-NC 4.0", html)
+        self.assertIn("Carlos Polop", html)
+
+    def test_per_host_navigator_present(self):
+        html = self._html("sample-scripts.xml")
+        self.assertIn('id="hostq"', html)        # host filter
+        self.assertIn('data-act="expand"', html)  # expand-all button
 
 
 class TestScanAware(unittest.TestCase):

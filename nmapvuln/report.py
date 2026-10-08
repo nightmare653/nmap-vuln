@@ -419,6 +419,25 @@ a.kblink:hover{text-decoration:none;border-bottom-style:solid}
 .copybtn{position:absolute;top:4px;right:4px;padding:2px 8px;font-size:11px;opacity:.75}
 .copybtn:hover{opacity:1}
 .copybtn.ok{color:var(--low);border-color:var(--low)}
+.srctag{display:inline-block;margin-left:4px;padding:0 7px;border-radius:9px;font-size:11px;
+  font-weight:600;background:var(--accent);color:#fff;vertical-align:middle}
+.htblock{margin-top:12px;border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:7px;padding:8px 10px;background:var(--chip)}
+.htlabel{font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:4px}
+pre.htcmd{position:relative;margin:5px 0;overflow-x:auto;background:var(--bg);
+  border:1px solid var(--line);border-radius:5px;padding:7px 9px}
+pre.htcmd code{white-space:pre;font-size:12.5px}
+.htcredit{margin-top:6px;font-size:11.5px;color:var(--muted)}
+.htcredit a{color:var(--accent)}
+.navbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 12px;
+  position:sticky;top:46px;background:var(--bg);padding:6px 0;z-index:4}
+.navbar input{flex:1;min-width:200px;padding:8px 11px;border:1px solid var(--line);
+  border-radius:8px;background:var(--panel);color:var(--ink);font-size:14px}
+.minibtn{appearance:none;border:1px solid var(--line);background:var(--chip);color:var(--muted);
+  border-radius:8px;cursor:pointer;font-size:12.5px;padding:7px 12px;white-space:nowrap}
+.minibtn:hover{color:var(--accent);border-color:var(--accent)}
+.navcount{font-size:12.5px;color:var(--muted)}
 """
 
 JS = """
@@ -518,6 +537,32 @@ JS = """
       var a=document.createElement('a');a.href=URL.createObjectURL(blob);
       a.download=btn.dataset.file||'export.csv';document.body.appendChild(a);a.click();
       setTimeout(function(){URL.revokeObjectURL(a.href);document.body.removeChild(a);},100);
+    });
+  });
+
+  // Per-host filter box.
+  var hq=document.getElementById('hostq'), hc=document.getElementById('hostcount');
+  if(hq){
+    var hrows=[].slice.call(document.querySelectorAll('#tab-host details.kb'));
+    function hfilter(){
+      var t=(hq.value||'').toLowerCase(), n=0;
+      hrows.forEach(function(d){
+        var hit=d.querySelector('summary').textContent.toLowerCase().indexOf(t)>-1;
+        d.style.display=hit?'':'none'; if(hit)n++;
+      });
+      if(hc)hc.textContent=n+' of '+hrows.length+' hosts';
+    }
+    hq.addEventListener('input',hfilter); hfilter();
+  }
+
+  // Expand all / collapse all buttons, scoped to a tab.
+  [].slice.call(document.querySelectorAll('.minibtn')).forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var scope=document.getElementById(btn.dataset.scope); if(!scope)return;
+      var open=btn.dataset.act==='expand';
+      [].slice.call(scope.querySelectorAll('details.kb')).forEach(function(d){
+        if(d.style.display!=='none')d.open=open;
+      });
     });
   });
 
@@ -713,36 +758,70 @@ def _kb_rows_table(rows: list[dict], subst: Optional[tuple[str, int]] = None) ->
     return "".join(out)
 
 
-def _kb_block(analysis: Analysis) -> str:
-    """Per-service knowledge bank: detected services open and expanded, the rest
-    collapsed below them so the whole bank stays browsable."""
-    detected = knowledge.detected(analysis.hosts)
-    detected_keys = {e["key"] for e, _ in detected}
-    detected_where = {e["key"]: where for e, where in detected}
+def _ht_section_html(ht: dict, subst: Optional[tuple[str, int]]) -> str:
+    """Render a HackTricks entry's commands, grouped by heading, with credit."""
+    parts = []
+    summary = ht.get("summary")
+    if summary:
+        parts.append(f'<div class="kb-intro">{_esc(summary)}</div>')
+    for section in ht.get("sections", []):
+        heading = section.get("heading") or ""
+        if heading:
+            parts.append(f'<div class="phase-head">{_esc(heading)}</div>')
+        for cmd in section.get("commands", []):
+            text = knowledge.substitute(cmd, subst[0], subst[1]) if subst else cmd
+            parts.append(f'<pre class="htcmd"><code>{_esc(text)}</code></pre>')
+    ref = ht.get("reference")
+    credit = (
+        '<div class="htcredit">Source: '
+        f'<a href="{_esc(ref)}" target="_blank" rel="noopener">HackTricks</a> '
+        "by Carlos Polop, licensed CC BY-NC 4.0.</div>"
+    )
+    return f'<div class="htblock"><div class="htlabel">HackTricks commands</div>{"".join(parts)}{credit}</div>'
 
-    everything = knowledge.service_bank()
-    ordered = [e for e, _ in detected] + [e for e in everything if e["key"] not in detected_keys]
-    if not ordered:
+
+def _kb_block(analysis: Analysis) -> str:
+    """Per-service knowledge bank. Each card merges the team spreadsheet bank and
+    the HackTricks commands for that service. Detected services open first; the
+    rest of both banks stay browsable below."""
+    cards = knowledge.merged_service_cards(analysis.hosts)
+    if not cards:
         return '<div class="empty">Knowledge bank is empty.</div>'
 
     blocks = []
-    for entry in ordered:
-        is_det = entry["key"] in detected_keys
-        ports = ", ".join(str(p) for p in entry.get("ports", []))
-        where = ""
-        subst = None
+    for card in cards:
+        xlsx, ht = card["xlsx"], card["ht"]
+        is_det = card["detected"]
+        key = (xlsx or {}).get("key") or ht["key"]
+        ports = ", ".join(str(p) for p in card["ports"])
+
+        where, subst = "", None
         if is_det:
-            seen = detected_where[entry["key"]]
+            seen = card["where"]
             where = f'<span class="where"> — detected on {_esc(", ".join(seen))}</span>'
             ip, pid = seen[0].rsplit(":", 1)
             subst = (ip, int(pid))
-        intro = f'<div class="kb-intro">{_esc(entry.get("intro") or "")}</div>' if entry.get("intro") else ""
+
+        body = ""
+        if xlsx:
+            if xlsx.get("intro"):
+                body += f'<div class="kb-intro">{_esc(xlsx["intro"])}</div>'
+            body += _kb_rows_table(xlsx["rows"], subst)
+        if ht:
+            body += _ht_section_html(ht, subst)
+
+        tags = ""
+        if xlsx and ht:
+            tags = '<span class="srctag">team + HackTricks</span>'
+        elif ht:
+            tags = '<span class="srctag">HackTricks</span>'
+
         blocks.append(
-            f'<details class="kb" id="kb-{_esc(entry["key"])}" '
+            f'<details class="kb" id="kb-{_esc(key)}" '
             f'data-detected="{"1" if is_det else "0"}"{" open" if is_det else ""}>'
-            f'<summary>{_esc(entry["name"])} '
-            f'<span class="where">[{_esc(ports)}]</span>{where}</summary>'
-            f'<div class="kb-body">{intro}{_kb_rows_table(entry["rows"], subst)}</div></details>'
+            f'<summary>{_esc(card["name"])} '
+            f'<span class="where">[{_esc(ports)}]</span> {tags}{where}</summary>'
+            f'<div class="kb-body">{body}</div></details>'
         )
     return "".join(blocks)
 
@@ -1046,7 +1125,7 @@ def write_html(
     n_cve = len(analysis.findings)
     n_weak = len(analysis.weaknesses)
     n_enum = len(build_playbook(analysis.hosts)) if include_playbook else 0
-    n_kb = len(knowledge.detected(analysis.hosts))
+    n_kb = sum(1 for c in knowledge.merged_service_cards(analysis.hosts) if c["detected"])
     n_net = len(knowledge.network_bank().get("topics", []))
 
     def tab_btn(tab_id: str, label: str, pill=None) -> str:
@@ -1190,7 +1269,11 @@ def write_html(
     <p class="note">Per-service enumeration and exploitation methodology. Services found in
        this scan are expanded first (commands filled in for the detected host); the rest of
        the bank is below, collapsed. <strong>Authorised testing only.</strong></p>
-    <div class="controls"><input id="kbq" type="search" placeholder="Filter the knowledge base…"></div>
+    <div class="navbar">
+      <input id="kbq" type="search" placeholder="Filter the knowledge base…">
+      <button class="minibtn" data-act="expand" data-scope="tab-kb">Expand all</button>
+      <button class="minibtn" data-act="collapse" data-scope="tab-kb">Collapse all</button>
+    </div>
     {_kb_block(analysis)}
   </div>
 
@@ -1207,7 +1290,13 @@ def write_html(
     <h2>Per-host triage</h2>
     <p class="note">Everything the scan knows about each host in one place — open ports
        (each links to its enumeration), findings, weaknesses, and the network leads that
-       name this host. Hosts with findings are expanded.</p>
+       name this host.</p>
+    <div class="navbar">
+      <input id="hostq" type="search" placeholder="Filter hosts by IP or name…">
+      <button class="minibtn" data-act="expand" data-scope="tab-host">Expand all</button>
+      <button class="minibtn" data-act="collapse" data-scope="tab-host">Collapse all</button>
+      <span class="navcount" id="hostcount"></span>
+    </div>
     {_triage_block(analysis)}
   </div>
 

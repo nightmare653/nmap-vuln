@@ -73,6 +73,81 @@ def network_bank() -> dict:
 
 
 @lru_cache(maxsize=1)
+def hacktricks_bank() -> dict:
+    """The HackTricks-derived per-service commands (CC BY-NC 4.0, attributed)."""
+    return _load("hacktricks_kb.json")
+
+
+@lru_cache(maxsize=1)
+def _ht_index() -> dict[int, dict]:
+    by_port: dict[int, dict] = {}
+    for entry in hacktricks_bank().get("services", []):
+        for port in entry.get("ports", []):
+            by_port.setdefault(int(port), entry)
+    return by_port
+
+
+def hacktricks_for_port(port: Port) -> Optional[dict]:
+    return _ht_index().get(port.portid)
+
+
+def merged_service_cards(hosts: list[Host]) -> list[dict]:
+    """Unified Service-KB cards, merging the spreadsheet bank and HackTricks.
+
+    Each card is ``{name, ports, where, detected, xlsx, ht}`` where ``xlsx`` is
+    the team spreadsheet entry (or None) and ``ht`` the HackTricks entry (or
+    None). Entries that share a port are merged into one card. Detected services
+    sort first; ``where`` lists the ``ip:port`` they were seen on.
+    """
+    xlsx = service_bank()
+    ht = hacktricks_bank().get("services", [])
+
+    # Which ports were actually open, and where.
+    seen: dict[int, list[str]] = {}
+    for host in hosts:
+        if host.status == "down":
+            continue
+        for port in host.open_ports:
+            if port.service.name != "tcpwrapped":
+                seen.setdefault(port.portid, []).append(f"{host.address}:{port.portid}")
+
+    ht_by_first = {e["ports"][0]: e for e in ht if e.get("ports")}
+    used_ht: set = set()
+    cards: list[dict] = []
+
+    def card_for(xentry, hentry) -> dict:
+        ports = sorted(set((xentry or {}).get("ports", []) + (hentry or {}).get("ports", [])))
+        where: list[str] = []
+        for p in ports:
+            where.extend(seen.get(p, []))
+        return {
+            "name": (xentry or hentry)["name"],
+            "ports": ports,
+            "where": sorted(set(where)),
+            "detected": bool(where),
+            "xlsx": xentry,
+            "ht": hentry,
+        }
+
+    for xentry in xlsx:
+        match = None
+        for p in xentry.get("ports", []):
+            if p in ht_by_first and p not in used_ht:
+                match = ht_by_first[p]
+                break
+        if match:
+            used_ht.add(match["ports"][0])
+        cards.append(card_for(xentry, match))
+
+    for hentry in ht:
+        if hentry["ports"][0] not in used_ht:
+            cards.append(card_for(None, hentry))
+
+    cards.sort(key=lambda c: (not c["detected"], c["ports"][0] if c["ports"] else 99999, c["name"]))
+    return cards
+
+
+@lru_cache(maxsize=1)
 def _indexes() -> tuple[dict[int, dict], dict[str, dict]]:
     by_port: dict[int, dict] = {}
     by_alias: dict[str, dict] = {}
@@ -99,10 +174,12 @@ def for_port(port: Port) -> Optional[dict]:
     return None
 
 
+# Placeholders appear as <IP>, {IP}, $IP etc. across the different sources.
 _IP_PLACEHOLDER = re.compile(
-    r"<\s*(?:ip|target[\w ]*|host|dns[\w_]*|victim[\w.]*|rhost)\s*>", re.I
+    r"[<{]\s*(?:ip|ip_address|target[\w ]*|host|hostname|dns[\w_]*|victim[\w.]*|rhost)\s*[>}]",
+    re.I,
 )
-_PORT_PLACEHOLDER = re.compile(r"<\s*(?:port|rport)\s*>", re.I)
+_PORT_PLACEHOLDER = re.compile(r"[<{]\s*(?:port|rport)\s*[>}]", re.I)
 
 
 def substitute(text: str, ip: str, port_id: int) -> str:
