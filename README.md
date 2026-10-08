@@ -188,6 +188,38 @@ Lookups are cached so repeat runs are fast and free.
 | `--cache-ttl SECS` | How long cached results stay valid, in seconds. Default: `604800` (7 days). | To refresh more or less often. |
 | `--no-cache` | Do not read or write the cache at all. | To force completely fresh lookups. |
 
+### Local exploit correlation
+
+Flag CVEs that have a ready-made public exploit in a local copy of Exploit-DB or
+Metasploit — a far stronger "this is real" signal than a CVSS score, and it works
+fully offline. On Kali the paths are auto-detected; otherwise point at them.
+
+| Flag | What it does | When to use it |
+|---|---|---|
+| `--exploitdb PATH` | Path to Exploit-DB's `files_exploits.csv`. Auto-detected at `/usr/share/exploitdb/…` on Kali. | When you have Exploit-DB locally and want findings tagged with EDB entries. |
+| `--msf-path PATH` | Path to Metasploit's `modules_metadata_base.json` (or its folder). Auto-detected on Kali. | When you have Metasploit locally and want findings tagged with MSF modules. |
+
+Findings with a local exploit get an `exploit: EDB/MSF` tag and sort to the top.
+
+### Config file (stop retyping flags)
+
+Save your defaults in a `.nmapvulnrc` file and they apply automatically; anything
+you type on the command line still wins. nmapvuln looks for `./.nmapvulnrc`, then
+`~/.nmapvulnrc`.
+
+```ini
+# .nmapvulnrc  — a [nmapvuln] section, or just bare key = value lines
+[nmapvuln]
+nvd-key = YOUR-KEY-HERE
+min-cvss = 4.0
+out = reports
+```
+
+| Flag | What it does | When to use it |
+|---|---|---|
+| `--config PATH` | Use this config file instead of auto-discovery. | A config somewhere non-standard. |
+| `--no-config` | Ignore any `.nmapvulnrc`. | A one-off run with pure defaults. |
+
 ### Input and logging
 
 | Flag | What it does | When to use it |
@@ -251,8 +283,22 @@ Two ideas that make the report trustworthy:
   the flag that brings them back. A short report never looks the same as a clean
   target.
 - **Findings are ranked by real-world risk**, not just CVSS. A CVE in CISA's
-  exploited catalog sorts to the top and is tagged `KEV`; each row also shows its
-  EPSS score (the probability it will be exploited in the next 30 days).
+  exploited catalog sorts to the top and is tagged `KEV`; one with a local
+  exploit is tagged `exploit: EDB/MSF`; each row also shows its EPSS score (the
+  probability it will be exploited in the next 30 days).
+
+Getting around the report:
+
+- **Search everything** — the box in the top bar filters every tab at once (CVE,
+  weaknesses, knowledge base, hosts) and shows a live match count on each tab.
+- **Theme toggle** — the ◐ button in the corner cycles auto → light → dark, and
+  remembers your choice.
+- **Sort any table** — click a column header (Severity, CVSS, Host, Port) to sort;
+  click again to reverse.
+- **Print / save as PDF** — Ctrl-P produces a clean, flattened report with the
+  controls removed, for handing off or archiving.
+- **Copy buttons** on every command, **Export CSV** on the tables, and a port in
+  the findings/weaknesses tables links straight to how to enumerate it.
 
 ---
 
@@ -367,11 +413,12 @@ optionally Vulners), then ranks by CISA KEV and EPSS.
 
 | Area | Examples |
 |---|---|
-| **TLS** | weak/export/anonymous Diffie-Hellman, SSLv2/SSLv3, TLS 1.0/1.1, NULL/RC4/3DES/export ciphers, expired or self-signed certs, MD5/SHA-1 signatures, undersized keys, Heartbleed, CCS injection |
+| **TLS** | weak/export/anonymous Diffie-Hellman, SSLv2/SSLv3, TLS 1.0/1.1, NULL/RC4/3DES/export ciphers, expired or self-signed certs, **hostname mismatch**, MD5/SHA-1 signatures, undersized keys, Heartbleed, CCS injection |
 | **SSH** | weak key exchange/MAC/cipher, DSA host keys, undersized host keys, SSHv1 |
 | **SMB** | signing not required, SMBv1, guest/anonymous access |
-| **Services** | anonymous FTP, open DNS recursion, default SNMP community, NFS exports, risky HTTP methods, exposed `.git`/backups, LDAP anonymous bind, RDP without NLA, VNC without auth, unauthenticated MongoDB/Redis/Elasticsearch, empty-password MySQL |
-| **Exposure** | cleartext protocols and internal datastores reachable on the scanned interface |
+| **HTTP** | risky methods (PUT/DELETE/TRACE), open proxy, exposed `.git`/backups, directory listing, **missing HSTS**, **missing Content-Security-Policy** |
+| **Services** | anonymous FTP, open DNS recursion, default SNMP community, **NTP monlist amplification**, NFS exports, LDAP anonymous bind, RDP without NLA, VNC without auth, unauthenticated MongoDB/Redis/Elasticsearch, empty-password MySQL |
+| **Exposure** | cleartext protocols and internal datastores reachable on the scanned interface (TCP and UDP) |
 
 **Scan validation** flags problems with the scan itself so you don't mistake a
 bad scan for a clean target: incomplete scans, no version detection, all-filtered
@@ -414,7 +461,7 @@ The report includes reference material to help you act on findings:
 python tests/test_nmapvuln.py
 ```
 
-153 tests covering the parsers, CVE matching, the weakness rules, the knowledge
+165 tests covering the parsers, CVE matching, the weakness rules, the knowledge
 banks, the exports, and one regression test for every false positive the tool has
 ever produced. No test touches the network. Test fixtures live in `samples/` and
 can be rebuilt with `python tests/make_samples.py`.

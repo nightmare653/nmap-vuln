@@ -119,10 +119,34 @@ class Certificate:
     signature_algorithm: str = ""
     not_before: Optional[datetime.datetime] = None
     not_after: Optional[datetime.datetime] = None
+    san: str = ""  # raw "Subject Alternative Name" value
 
     @property
     def self_signed(self) -> bool:
         return bool(self.subject) and self.subject == self.issuer
+
+    def names(self) -> list[str]:
+        """Every DNS name the certificate is valid for (CN + SANs), lowercased."""
+        out: list[str] = []
+        cn = re.search(r"commonName=([^/,\n]+)", self.subject, re.I)
+        if cn:
+            out.append(cn.group(1).strip().lower())
+        for dns in re.findall(r"DNS:([^\s,]+)", self.san, re.I):
+            out.append(dns.strip().lower())
+        return [n for n in out if n]
+
+    def covers(self, hostname: str) -> bool:
+        """True if the certificate is valid for ``hostname`` (wildcards included)."""
+        hostname = (hostname or "").strip().lower().rstrip(".")
+        if not hostname:
+            return True
+        for name in self.names():
+            if name == hostname:
+                return True
+            if name.startswith("*.") and "." in hostname:
+                if hostname.split(".", 1)[1] == name[2:]:
+                    return True
+        return False
 
     def expired_at(self, when: datetime.datetime) -> bool:
         return self.not_after is not None and self.not_after < when
@@ -162,6 +186,16 @@ class Certificate:
         return None
 
 
+def http_header_names(output: str) -> set:
+    """Lowercased response-header names from http-headers script output."""
+    names = set()
+    for line in normalise(output).splitlines():
+        m = re.match(r"^\s*([A-Za-z][A-Za-z0-9-]+)\s*:", line)
+        if m:
+            names.add(m.group(1).strip().lower())
+    return names
+
+
 def parse_certificate(output: str) -> Optional[Certificate]:
     data = fields(output)
     if not data:
@@ -173,6 +207,7 @@ def parse_certificate(output: str) -> Optional[Certificate]:
         signature_algorithm=data.get("Signature Algorithm", ""),
         not_before=_parse_date(data.get("Not valid before", "")),
         not_after=_parse_date(data.get("Not valid after", "")),
+        san=data.get("Subject Alternative Name", ""),
     )
     bits = data.get("Public Key bits", "")
     if bits.isdigit():

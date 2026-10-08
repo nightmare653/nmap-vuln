@@ -49,6 +49,7 @@ CSV_COLUMNS = [
     "epss",
     "backport_suspected",
     "exploit_known",
+    "exploit_refs",
     "published",
     "matched_on",
     "description",
@@ -81,6 +82,7 @@ def write_csv(analysis: Analysis, path: str) -> str:
                     "" if f.epss is None else f"{f.epss:.5f}",
                     "yes" if f.backport_suspected else "no",
                     "yes" if f.exploit_known else "no",
+                    " | ".join(f.exploit_refs),
                     f.published,
                     f.matched_on,
                     " ".join((f.description or "").split()),
@@ -175,7 +177,8 @@ def _analysis_dict(analysis: Analysis) -> dict:
             "product": f.product, "cve": f.cve, "cvss": f.cvss, "severity": f.severity,
             "confidence": f.confidence, "source": f.source, "kev": f.kev, "kev_due": f.kev_due,
             "epss": f.epss, "backport_suspected": f.backport_suspected,
-            "exploit_known": f.exploit_known, "published": f.published,
+            "exploit_known": f.exploit_known, "exploit_refs": f.exploit_refs,
+            "published": f.published,
             "matched_on": f.matched_on, "description": f.description,
             "references": f.references, "scan_file": f.scan_file,
         } for f in analysis.findings],
@@ -306,21 +309,30 @@ def write_enumeration_csv(analysis: Analysis, path: str) -> str:
 CSS = """
 :root{
   --bg:#f6f7f9; --panel:#ffffff; --ink:#14181f; --muted:#5c6673; --line:#e2e6eb;
-  --accent:#2a5bd7; --chip:#eef1f6;
+  --accent:#2a5bd7; --accent-soft:#e7edfb; --chip:#eef1f6; --shadow:0 1px 3px rgba(20,24,31,.06);
   --crit:#8b1a1a; --crit-bg:#fdeaea; --high:#b64a06; --high-bg:#fdf0e6;
   --med:#8a6100; --med-bg:#fcf5e2; --low:#2f6a4f; --low-bg:#eaf5ef;
   --unk:#4a5260; --unk-bg:#eef0f3;
   --err:#8b1a1a; --warn:#8a6100; --info:#3a5670;
 }
-@media (prefers-color-scheme:dark){
-  :root{
+/* Dark palette applies automatically in a dark OS, unless the viewer forced
+   light with the toggle. */
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
     --bg:#0f1216; --panel:#161a21; --ink:#e6e9ee; --muted:#98a2b0; --line:#262c36;
-    --accent:#7aa2f7; --chip:#1e242d;
+    --accent:#7aa2f7; --accent-soft:#1b2537; --chip:#1e242d; --shadow:0 1px 3px rgba(0,0,0,.3);
     --crit:#ff8a8a; --crit-bg:#2c1618; --high:#ffb072; --high-bg:#2b1d12;
     --med:#f2d07a; --med-bg:#2a2413; --low:#8fd6b0; --low-bg:#132420;
     --unk:#aab3c0; --unk-bg:#1c212a;
     --err:#ff8a8a; --warn:#f2d07a; --info:#9dc0e8;
-  }
+}}
+/* Forced dark wins in both directions (the toggle). */
+:root[data-theme="dark"]{
+    --bg:#0f1216; --panel:#161a21; --ink:#e6e9ee; --muted:#98a2b0; --line:#262c36;
+    --accent:#7aa2f7; --accent-soft:#1b2537; --chip:#1e242d; --shadow:0 1px 3px rgba(0,0,0,.3);
+    --crit:#ff8a8a; --crit-bg:#2c1618; --high:#ffb072; --high-bg:#2b1d12;
+    --med:#f2d07a; --med-bg:#2a2413; --low:#8fd6b0; --low-bg:#132420;
+    --unk:#aab3c0; --unk-bg:#1c212a;
+    --err:#ff8a8a; --warn:#f2d07a; --info:#9dc0e8;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);
@@ -355,11 +367,13 @@ td.nowrap,th.nowrap{white-space:nowrap}
   color:var(--muted);font-size:11.5px;white-space:nowrap}
 .tag.kev{background:var(--crit-bg);color:var(--crit);font-weight:600}
 .tag.exp{background:var(--crit-bg);color:var(--crit);font-weight:650}
+.tag.exploit-local{background:var(--crit);color:#fff;font-weight:700;cursor:help}
 .desc{color:var(--muted);font-size:12.5px;max-width:520px}
 .controls{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .controls input,.controls select{background:var(--panel);color:var(--ink);
   border:1px solid var(--line);border-radius:7px;padding:7px 10px;font-size:13px}
 .controls input{min-width:240px;flex:1}
+.controls input[type="search"]{display:none}  /* global header search replaces per-tab boxes */
 .issue{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
 .issue:last-child{border-bottom:none}
 .issue .code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;
@@ -379,7 +393,7 @@ details.pb[open] summary{border-bottom:1px solid var(--line)}
 details.pb .tablewrap{padding:4px 10px 10px}
 details.pb code{white-space:pre-wrap;word-break:break-all}
 .tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:2px solid var(--line);
-  margin:18px 0 0;position:sticky;top:0;background:var(--bg);z-index:5;padding-top:6px}
+  margin:4px 0 0;background:var(--bg);padding-top:2px}
 .tabs button{appearance:none;border:1px solid var(--line);border-bottom:none;
   background:var(--chip);color:var(--muted);padding:8px 14px;font-size:13.5px;
   border-radius:7px 7px 0 0;cursor:pointer;font-weight:600}
@@ -431,13 +445,46 @@ pre.htcmd code{white-space:pre;font-size:12.5px}
 .htcredit{margin-top:6px;font-size:11.5px;color:var(--muted)}
 .htcredit a{color:var(--accent)}
 .navbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 12px;
-  position:sticky;top:46px;background:var(--bg);padding:6px 0;z-index:4}
+  background:var(--bg);padding:6px 0}
+.navbar input{display:none}  /* text filtering is handled by the global search */
 .navbar input{flex:1;min-width:200px;padding:8px 11px;border:1px solid var(--line);
   border-radius:8px;background:var(--panel);color:var(--ink);font-size:14px}
 .minibtn{appearance:none;border:1px solid var(--line);background:var(--chip);color:var(--muted);
   border-radius:8px;cursor:pointer;font-size:12.5px;padding:7px 12px;white-space:nowrap}
 .minibtn:hover{color:var(--accent);border-color:var(--accent)}
 .navcount{font-size:12.5px;color:var(--muted)}
+/* --- app header: brand, global search, theme toggle, tabs --- */
+.apphead{position:sticky;top:0;z-index:20;background:var(--bg);
+  margin:-32px -20px 16px;padding:14px 20px 0;border-bottom:1px solid var(--line);box-shadow:var(--shadow)}
+.approw{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.brand h1{font-size:20px;margin:0;display:flex;align-items:center;gap:9px}
+.brand .dot{width:11px;height:11px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 0 4px var(--accent-soft)}
+.brand .meta{color:var(--muted);font-size:12.5px;margin-top:2px}
+.tools{display:flex;gap:8px;align-items:center}
+.search{position:relative}
+.search input{width:260px;max-width:52vw;padding:9px 12px 9px 32px;border:1px solid var(--line);
+  border-radius:9px;background:var(--panel);color:var(--ink);font-size:13.5px}
+.search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);
+  width:15px;height:15px;stroke:var(--muted);fill:none;stroke-width:2}
+.iconbtn{appearance:none;width:38px;height:38px;border:1px solid var(--line);border-radius:9px;
+  background:var(--panel);color:var(--ink);cursor:pointer;font-size:16px;display:grid;place-items:center}
+.iconbtn:hover{border-color:var(--accent);color:var(--accent)}
+th.sortable{cursor:pointer;user-select:none} th.sortable:hover{color:var(--ink)}
+th.sortable::after{content:"\\2195";opacity:.35;margin-left:5px;font-size:10px}
+th.sortasc::after{content:"\\2191";opacity:.9} th.sortdesc::after{content:"\\2193";opacity:.9}
+.card{transition:transform .08s ease} .card:hover{transform:translateY(-1px)}
+@media print{
+  .apphead,.tabs,.navbar,.controls,.expbtn,.copybtn,.minibtn,.iconbtn,.search{display:none!important}
+  .panel-tab{display:block!important;break-inside:avoid}
+  .panel-tab>h2{break-after:avoid;border-top:2px solid #000;padding-top:10px;margin-top:22px}
+  details.kb,details.pb{open:open} details[open]>summary{font-weight:700}
+  details:not([open]) .kb-body{display:block!important}
+  body{background:#fff;color:#000} a{color:#000;text-decoration:underline}
+  .tablewrap{overflow:visible;border:none} table{min-width:0;font-size:11px}
+  .wrap{max-width:none;padding:0}
+}
 """
 
 JS = """
@@ -577,6 +624,69 @@ JS = """
     });
   });
 })();
+
+// Theme toggle: cycles auto -> light -> dark, remembered per browser.
+(function(){
+  var order=['auto','light','dark'], icon={auto:'\\u25D0',light:'\\u2600',dark:'\\u263E'};
+  var root=document.documentElement, btn=document.getElementById('themebtn'), cur='auto';
+  try{cur=localStorage.getItem('nv-theme')||'auto';}catch(e){}
+  function apply(t){
+    if(t==='auto'){root.removeAttribute('data-theme');}else{root.setAttribute('data-theme',t);}
+    if(btn){btn.textContent=icon[t];btn.title='Theme: '+t+' (click to change)';}
+    try{localStorage.setItem('nv-theme',t);}catch(e){}
+  }
+  apply(cur);
+  if(btn)btn.addEventListener('click',function(){cur=order[(order.indexOf(cur)+1)%3];apply(cur);});
+})();
+
+// Global search: one box filters every tab; tab pills show live match counts.
+(function(){
+  var gq=document.getElementById('globalq'); if(!gq)return;
+  var subs=['q','wq','kbq','hostq'].map(function(id){return document.getElementById(id);});
+  var pills={}; [].slice.call(document.querySelectorAll('.tabs button')).forEach(function(b){
+    var p=b.querySelector('.pill'); if(p)pills[b.dataset.tab]={el:p,orig:p.textContent};
+  });
+  function setPill(tab,n){ if(pills[tab])pills[tab].el.textContent=n; }
+  function vis(sel){return [].slice.call(document.querySelectorAll(sel)).filter(function(e){return e.style.display!=='none';}).length;}
+  function filt(sel,t){[].slice.call(document.querySelectorAll(sel)).forEach(function(e){
+    e.style.display=e.textContent.toLowerCase().indexOf(t)>-1?'':'none';});}
+  function run(){
+    var t=(gq.value||'').toLowerCase();
+    subs.forEach(function(el){if(el){el.value=t;el.dispatchEvent(new Event('input'));}});
+    filt('#tab-enum details.pb',t); filt('#tab-net details.kb',t); filt('#tab-inv #inventory tbody tr',t);
+    if(!t){ for(var k in pills)pills[k].el.textContent=pills[k].orig; return; }
+    setPill('tab-cve',vis('#findings tbody tr[data-sev]'));
+    setPill('tab-weak',vis('#weaknesses tbody tr[data-wsev]'));
+    setPill('tab-enum',vis('#tab-enum details.pb'));
+    setPill('tab-net',vis('#tab-net details.kb'));
+    setPill('tab-kb',vis('#tab-kb details.kb'));
+    setPill('tab-host',vis('#tab-host details.kb'));
+  }
+  gq.addEventListener('input',run);
+})();
+
+// Sortable tables: click a header to sort, click again to reverse.
+(function(){
+  var rank={CRITICAL:5,HIGH:4,MEDIUM:3,LOW:2,UNKNOWN:1};
+  [].slice.call(document.querySelectorAll('table th.sortable')).forEach(function(th){
+    th.addEventListener('click',function(){
+      var table=th.closest('table'), tbody=table.querySelector('tbody');
+      var idx=[].slice.call(th.parentNode.children).indexOf(th);
+      var type=th.dataset.sort, asc=!th.classList.contains('sortasc');
+      [].slice.call(table.querySelectorAll('th')).forEach(function(h){h.classList.remove('sortasc','sortdesc');});
+      th.classList.add(asc?'sortasc':'sortdesc');
+      var rows=[].slice.call(tbody.querySelectorAll('tr')).filter(function(r){return r.children.length>idx&&!r.querySelector('.empty');});
+      rows.sort(function(a,b){
+        var x=(a.children[idx].innerText||'').trim(), y=(b.children[idx].innerText||'').trim(), r;
+        if(type==='sev'){r=(rank[x.toUpperCase()]||0)-(rank[y.toUpperCase()]||0);}
+        else if(type==='num'){r=(parseFloat(x)||-1)-(parseFloat(y)||-1);}
+        else{var lx=x.toLowerCase(),ly=y.toLowerCase(); r=lx<ly?-1:(lx>ly?1:0);}
+        return asc?r:-r;
+      });
+      rows.forEach(function(r){tbody.appendChild(r);});
+    });
+  });
+})();
 """
 
 
@@ -606,6 +716,17 @@ def _finding_row(f: Finding) -> str:
         else _esc(f.cve)
     )
     exploit = ' <span class="tag exp">exploit</span>' if f.exploit_known else ""
+    # A ready-made local exploit (Exploit-DB / Metasploit) is a very strong
+    # signal; show which and how many.
+    if f.exploit_refs:
+        kinds = []
+        if any(r.startswith("EDB") for r in f.exploit_refs):
+            kinds.append("EDB")
+        if any(r.startswith("msf:") for r in f.exploit_refs):
+            kinds.append("MSF")
+        title = _esc("; ".join(f.exploit_refs))
+        exploit = (f' <span class="tag exploit-local" title="{title}">exploit: '
+                   f'{"/".join(kinds) or "local"}</span>')
     # CISA KEV is the strongest single signal in the row: the vulnerability has
     # been seen used against real targets, which no CVSS score tells you.
     if f.kev:
@@ -1156,10 +1277,23 @@ def write_html(
 
     body = f"""
 <div class="wrap">
-  <h1>{_esc(title)}</h1>
-  <p class="sub">Generated {generated} · {len(analysis.scans)} scan file(s) ·
-     {len(live)} live host(s) · {open_ports} open port(s) ·
-     lookup source: {_esc(mode)} · {analysis.queried} unique service signature(s) queried</p>
+  <header class="apphead">
+    <div class="approw">
+      <div class="brand">
+        <h1><span class="dot"></span>{_esc(title)}</h1>
+        <div class="meta">Generated {generated} · {len(analysis.scans)} scan file(s) ·
+           {len(live)} live host(s) · {open_ports} open port(s) · {_esc(mode)}</div>
+      </div>
+      <div class="tools">
+        <label class="search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
+          <input id="globalq" type="search" placeholder="Search everything…" autocomplete="off">
+        </label>
+        <button id="themebtn" class="iconbtn" title="Toggle light / dark / auto" aria-label="Toggle theme">◐</button>
+      </div>
+    </div>
+    <div class="tabs">{tabs}</div>
+  </header>
 
   <div class="cards">
     <div class="card crit"><div class="n">{counts['CRITICAL']}</div><div class="l">Critical</div></div>
@@ -1169,8 +1303,6 @@ def write_html(
     <div class="card"><div class="n">{errors}</div><div class="l">Scan errors</div></div>
     <div class="card"><div class="n">{warns}</div><div class="l">Scan warnings</div></div>
   </div>
-
-  <div class="tabs">{tabs}</div>
 
   <div class="panel-tab" id="tab-overview">
     <p class="note">Totals combine {len(analysis.findings)} CVE finding(s) and
@@ -1234,8 +1366,11 @@ def write_html(
     <p class="note" id="count"></p>
     <div class="tbar"><button class="expbtn" data-table="findings" data-file="findings.csv">⬇ Export CSV</button></div>
     <div class="tablewrap"><table id="findings"><thead><tr>
-      <th class="nowrap">Severity</th><th class="nowrap">CVSS</th><th>CVE</th><th>Host</th>
-      <th>Port</th><th>Service</th><th>Match</th><th>Description</th>
+      <th class="nowrap sortable" data-sort="sev">Severity</th>
+      <th class="nowrap sortable" data-sort="num">CVSS</th>
+      <th class="sortable" data-sort="text">CVE</th>
+      <th class="sortable" data-sort="text">Host</th>
+      <th class="sortable" data-sort="num">Port</th><th>Service</th><th>Match</th><th>Description</th>
     </tr></thead><tbody>{rows}</tbody></table></div>
   </div>
 
@@ -1257,7 +1392,10 @@ def write_html(
     <p class="note" id="wcount"></p>
     <div class="tbar"><button class="expbtn" data-table="weaknesses" data-file="weaknesses.csv">⬇ Export CSV</button></div>
     <div class="tablewrap"><table id="weaknesses"><thead><tr>
-      <th class="nowrap">Severity</th><th>Host</th><th>Port</th><th>Weakness</th>
+      <th class="nowrap sortable" data-sort="sev">Severity</th>
+      <th class="sortable" data-sort="text">Host</th>
+      <th class="sortable" data-sort="num">Port</th>
+      <th class="sortable" data-sort="text">Weakness</th>
       <th>Evidence</th><th>Recommendation</th>
     </tr></thead><tbody>{weakness_rows}</tbody></table></div>
   </div>

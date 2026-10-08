@@ -188,10 +188,15 @@ class Finding:
     # the advertised version, so a version match against one is unreliable.
     backport_suspected: bool = False
 
+    # Public exploits found in a local Exploit-DB / Metasploit copy, e.g.
+    # "EDB-12345" or "msf:exploit/linux/...". A far stronger signal than CVSS.
+    exploit_refs: list[str] = field(default_factory=list)
+
     @property
     def sort_key(self) -> tuple:
         return (
             0 if self.kev else 1,
+            0 if self.exploit_refs else 1,
             -SEVERITY_ORDER.get(self.severity, 0),
             -(self.cvss or 0.0),
             -CONFIDENCE_ORDER.get(self.confidence, 0),

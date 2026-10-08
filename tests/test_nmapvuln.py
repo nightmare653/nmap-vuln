@@ -1285,5 +1285,132 @@ class TestPlaybook(unittest.TestCase):
         self.assertNotIn("Enumeration playbook", without_pb)
 
 
+class TestConfigFile(unittest.TestCase):
+    def test_parses_section_and_bare(self):
+        from nmapvuln.cli import _load_config
+        with tempfile.TemporaryDirectory() as tmp:
+            p = os.path.join(tmp, "rc")
+            with open(p, "w") as fh:
+                fh.write("# defaults\n[nmapvuln]\nmin-cvss = 7.0\nout = r\noffline = true\n")
+            cfg = _load_config(p)
+        self.assertEqual(cfg["min_cvss"], 7.0)
+        self.assertTrue(cfg["offline"])
+        self.assertEqual(cfg["out"], "r")
+
+    def test_cli_overrides_config(self):
+        import argparse
+        from nmapvuln.cli import build_parser, _load_config
+        with tempfile.TemporaryDirectory() as tmp:
+            p = os.path.join(tmp, "rc")
+            with open(p, "w") as fh:
+                fh.write("min-cvss = 7.0\nout = fromcfg\n")
+            args = build_parser().parse_args(["samples", "--min-cvss", "9.0"])
+            ep = build_parser()
+            for a in ep._actions:
+                a.default = argparse.SUPPRESS
+            provided = set(vars(ep.parse_args(["samples", "--min-cvss", "9.0"])).keys())
+            for k, v in _load_config(p).items():
+                if k not in provided:
+                    setattr(args, k, v)
+        self.assertEqual(args.min_cvss, 9.0)      # CLI wins
+        self.assertEqual(args.out, "fromcfg")     # config fills the rest
+
+
+class TestExploitIndex(unittest.TestCase):
+    def _index(self):
+        import csv as _csv
+        import json as _json
+        from nmapvuln.exploits import ExploitIndex
+        tmp = tempfile.mkdtemp()
+        edb = os.path.join(tmp, "files_exploits.csv")
+        with open(edb, "w", newline="", encoding="utf-8") as fh:
+            w = _csv.DictWriter(fh, fieldnames=["id", "file", "description", "codes"])
+            w.writeheader()
+            w.writerow({"id": "50383", "file": "x", "description": "Apache RCE",
+                        "codes": "CVE-2021-41773;OSVDB-1"})
+        msf = os.path.join(tmp, "modules_metadata_base.json")
+        _json.dump({"exploit/x": {"fullname": "exploit/x", "references": ["CVE-2021-41773"]}},
+                   open(msf, "w"))
+        return ExploitIndex(edb_path=edb, msf_path=msf).load()
+
+    def test_correlates_edb_and_msf(self):
+        idx = self._index()
+        refs = idx.for_cve("CVE-2021-41773")
+        self.assertIn("EDB-50383", refs)
+        self.assertTrue(any(r.startswith("msf:") for r in refs))
+
+    def test_normalises_cve_format(self):
+        self.assertEqual(self._index().for_cve("cve 2021 41773")[:1], ["EDB-50383"])
+
+    def test_annotate_flags_and_ranks(self):
+        idx = self._index()
+        f = Finding(cve="CVE-2021-41773", severity="HIGH")
+        g = Finding(cve="CVE-2000-0001", severity="CRITICAL")
+        n = idx.annotate([f, g])
+        self.assertEqual(n, 1)
+        self.assertTrue(f.exploit_refs)
+        # with a local exploit, f ranks above g despite lower severity
+        self.assertLess(f.sort_key, g.sort_key)
+
+
+class TestNewWeaknessRules(unittest.TestCase):
+    def _detect(self, scripts, hostnames=(), portid=443, tunnel="ssl", name="https"):
+        host = Host(address="1.1.1.1", status="up", hostnames=list(hostnames))
+        port = Port(portid=portid, state="open", service=Service(name=name, tunnel=tunnel))
+        for sid, out in scripts:
+            port.scripts.append(Script(id=sid, output=out))
+        host.ports.append(port)
+        return {w.rule_id for w in detect([ScanRun(source="x", fmt="xml", hosts=[host])],
+                                          include_exposure=False)}
+
+    def test_cert_hostname_mismatch(self):
+        cert = ("Subject: commonName=other.com\nSubject Alternative Name: DNS:other.com\n"
+                "Not valid after: 2030-01-01")
+        self.assertIn("TLS_CERT_HOSTNAME_MISMATCH",
+                      self._detect([("ssl-cert", cert)], hostnames=["victim.local"]))
+
+    def test_cert_hostname_match_is_quiet(self):
+        cert = ("Subject: commonName=victim.local\nSubject Alternative Name: DNS:victim.local\n"
+                "Not valid after: 2030-01-01")
+        self.assertNotIn("TLS_CERT_HOSTNAME_MISMATCH",
+                         self._detect([("ssl-cert", cert)], hostnames=["victim.local"]))
+
+    def test_missing_hsts_and_csp(self):
+        ids = self._detect([("http-headers", "  Server: nginx\n  Content-Type: text/html")])
+        self.assertIn("HTTP_MISSING_HSTS", ids)
+        self.assertIn("HTTP_MISSING_CSP", ids)
+
+    def test_present_headers_are_quiet(self):
+        good = "  Strict-Transport-Security: max-age=1\n  Content-Security-Policy: default-src 'self'"
+        ids = self._detect([("http-headers", good)])
+        self.assertNotIn("HTTP_MISSING_HSTS", ids)
+        self.assertNotIn("HTTP_MISSING_CSP", ids)
+
+    def test_ntp_monlist(self):
+        ids = self._detect([("ntp-monlist", "  Public Servers (0)\n  Other Associations (6)")],
+                           portid=123, tunnel="", name="ntp")
+        self.assertIn("NTP_MONLIST", ids)
+
+
+class TestUiControls(unittest.TestCase):
+    def _html(self):
+        analysis = Analysis()
+        analysis.scans.extend(parse_file(os.path.join(SAMPLES, "sample.xml")))
+        with tempfile.TemporaryDirectory() as tmp:
+            from nmapvuln.report import write_html
+            path = write_html(analysis, os.path.join(tmp, "r.html"))
+            return open(path, encoding="utf-8").read()
+
+    def test_global_search_and_theme_toggle(self):
+        html = self._html()
+        self.assertIn('id="globalq"', html)
+        self.assertIn('id="themebtn"', html)
+
+    def test_sortable_headers_and_print_style(self):
+        html = self._html()
+        self.assertIn('class="nowrap sortable"', html)
+        self.assertIn("@media print", html)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

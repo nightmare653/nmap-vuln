@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import configparser
 import os
 import sys
 
@@ -19,6 +20,7 @@ from .report import (
     write_validation_csv,
     write_weakness_csv,
 )
+from .exploits import ExploitIndex
 from .rules import detect
 from .sources import EpssClient, KevCatalog, NVDClient, VulnersClient
 from .validate import validate
@@ -84,15 +86,110 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--cache-ttl", type=int, default=DEFAULT_TTL, help="cache lifetime in seconds")
     p.add_argument("--no-cache", action="store_true", help="bypass the cache entirely")
 
+    p.add_argument("--exploitdb", default="",
+                   help="path to Exploit-DB's files_exploits.csv for local exploit "
+                        "correlation (auto-detected on Kali). Flags CVEs with a public exploit.")
+    p.add_argument("--msf-path", default="",
+                   help="path to a Metasploit modules tree for local module correlation "
+                        "(auto-detected on Kali).")
+
     p.add_argument("--no-recurse", action="store_true", help="do not descend into subdirectories")
     p.add_argument("-v", "--verbose", action="store_true", help="log every API query")
+    p.add_argument("--config", default="",
+                   help="config file with default options (default: ./.nmapvulnrc or "
+                        "~/.nmapvulnrc). CLI flags override it. Use --no-config to ignore.")
+    p.add_argument("--no-config", action="store_true", help="ignore any .nmapvulnrc file")
     p.add_argument("--version", action="version", version=f"nmapvuln {VERSION}")
     return p
+
+
+# Config keys map to argparse dest names; these are the ones worth saving.
+_CONFIG_KEYS = {
+    "out", "name", "title", "nvd_key", "vulners_key", "offline", "include_unversioned",
+    "include_backported", "include_tentative", "keyword_search", "no_verify_cpe",
+    "kev_only", "no_enrich", "no_rules", "no_exposure", "no_playbook", "min_cvss",
+    "fail_on", "cache", "cache_ttl", "no_cache", "no_recurse", "verbose",
+    "exploitdb", "msf_path",
+}
+_BOOL_KEYS = {
+    "offline", "include_unversioned", "include_backported", "include_tentative",
+    "keyword_search", "no_verify_cpe", "kev_only", "no_enrich", "no_rules",
+    "no_exposure", "no_playbook", "no_cache", "no_recurse", "verbose",
+}
+
+
+def _find_config(explicit: str) -> str:
+    if explicit:
+        return explicit
+    for candidate in (".nmapvulnrc", os.path.join(os.path.expanduser("~"), ".nmapvulnrc")):
+        if os.path.isfile(candidate):
+            return candidate
+    return ""
+
+
+def _load_config(path: str) -> dict:
+    """Read a .nmapvulnrc (INI with a [nmapvuln] section, or bare key=value)."""
+    parser = configparser.ConfigParser()
+    try:
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError:
+        return {}
+    has_section = any(
+        ln.strip().startswith("[")
+        for ln in text.splitlines()
+        if ln.strip() and not ln.strip().startswith(("#", ";"))
+    )
+    if not has_section:
+        text = "[nmapvuln]\n" + text
+    try:
+        parser.read_string(text)
+    except configparser.Error:
+        return {}
+    section = parser["nmapvuln"] if parser.has_section("nmapvuln") else {}
+
+    out: dict = {}
+    for key in section:
+        dest = key.strip().replace("-", "_")
+        if dest not in _CONFIG_KEYS:
+            continue
+        raw = section[key].strip()
+        if dest in _BOOL_KEYS:
+            out[dest] = raw.lower() in ("1", "true", "yes", "on")
+        elif dest == "min_cvss":
+            try:
+                out[dest] = float(raw)
+            except ValueError:
+                pass
+        elif dest == "cache_ttl":
+            try:
+                out[dest] = int(raw)
+            except ValueError:
+                pass
+        else:
+            out[dest] = raw
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    # Layer a .nmapvulnrc under the explicit CLI flags: a second parse with all
+    # defaults suppressed tells us which options the user actually typed, and
+    # config fills only the rest.
+    if not args.no_config:
+        explicit_parser = build_parser()
+        for action in explicit_parser._actions:
+            action.default = argparse.SUPPRESS
+        provided = set(vars(explicit_parser.parse_args(argv)).keys())
+        cfg_path = _find_config(args.config)
+        if cfg_path:
+            for key, val in _load_config(cfg_path).items():
+                if key not in provided:
+                    setattr(args, key, val)
+            if args.verbose:
+                print(f"[*] Loaded config from {cfg_path}", file=sys.stderr)
 
     # --kev-only decides what to keep from the CISA catalog, so without the
     # catalog it would silently discard every finding. Refuse instead.
@@ -172,6 +269,20 @@ def main(argv: list[str] | None = None) -> int:
                 finding.epss = scores[cve_id]
         analysis.findings.sort(key=lambda f: f.sort_key)
 
+    # Local exploit correlation (Exploit-DB / Metasploit), fully offline.
+    exploit_flagged = 0
+    if analysis.findings:
+        index = ExploitIndex(edb_path=args.exploitdb, msf_path=args.msf_path,
+                             verbose=args.verbose)
+        if index.available:
+            print(f"[*] Correlating exploits locally ({', '.join(index.loaded_sources) or '…'})",
+                  file=sys.stderr)
+            index.load()
+            exploit_flagged = index.annotate(analysis.findings)
+            for err in index.errors:
+                print(f"[!] {err}", file=sys.stderr)
+            analysis.findings.sort(key=lambda f: f.sort_key)
+
     if args.kev_only:
         keeping = [f for f in analysis.findings if f.kev]
         withheld = len(analysis.findings) - len(keeping)
@@ -216,6 +327,9 @@ def main(argv: list[str] | None = None) -> int:
     if kev_count:
         print(f"[!] {kev_count} finding(s) are in CISA's Known Exploited "
               f"Vulnerabilities catalog - treat these first", file=sys.stderr)
+    if exploit_flagged:
+        print(f"[!] {exploit_flagged} finding(s) have a public exploit in your local "
+              f"Exploit-DB / Metasploit copy", file=sys.stderr)
     if analysis.skipped_services:
         print(f"[!] {len(set(analysis.skipped_services))} service(s) unassessed "
               f"(no version) - re-run with --include-unversioned to include them", file=sys.stderr)

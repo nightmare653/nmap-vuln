@@ -128,6 +128,22 @@ SPECS: dict[str, Spec] = {
         "Re-issue the certificate with SHA-256 or stronger. SHA-1 collisions are "
         "practical and browsers reject such certificates.",
     ),
+    "TLS_CERT_HOSTNAME_MISMATCH": Spec(
+        "Certificate does not cover the host's name", "LOW", "tls",
+        "Issue a certificate whose CN/SAN matches the name clients use, or clients "
+        "will see a name-mismatch warning.",
+    ),
+    # -- HTTP security headers ---------------------------------------------
+    "HTTP_MISSING_HSTS": Spec(
+        "HTTPS without HTTP Strict Transport Security (HSTS)", "LOW", "http",
+        "Send 'Strict-Transport-Security: max-age=31536000; includeSubDomains' so "
+        "browsers refuse to downgrade to cleartext HTTP.",
+    ),
+    "HTTP_MISSING_CSP": Spec(
+        "No Content-Security-Policy header", "LOW", "http",
+        "Add a Content-Security-Policy to limit where scripts and other content may "
+        "load from; it is the main defence-in-depth against XSS.",
+    ),
     # -- SSH ----------------------------------------------------------------
     "SSH_WEAK_KEX": Spec(
         "Weak SSH key exchange algorithm offered", "MEDIUM", "ssh",
@@ -602,6 +618,16 @@ SERVICE_RULES = [
         "abused as amplifiers in DDoS reflection attacks.",
     ),
     Rule(
+        id="NTP_MONLIST",
+        title="NTP monlist enabled (amplification / info disclosure)",
+        severity="MEDIUM",
+        category="exposure",
+        scripts=("ntp-monlist",),
+        pattern=r"(Public Servers|Other Associations|\d+ addresses? found)",
+        recommendation="Disable the monlist/monitor query (noquery) or upgrade ntpd. "
+        "monlist is a high-ratio UDP amplification vector (CVE-2013-5211).",
+    ),
+    Rule(
         id="SNMP_DEFAULT_COMMUNITY",
         title="SNMP readable with a default community string",
         severity="HIGH",
@@ -840,6 +866,36 @@ def _weakness(
     )
 
 
+def _host_aware_detections(script: Script, host: Host, port: Optional[Port]) -> list[Detection]:
+    """Checks that need the host's names or the port's TLS state, not just the
+    script text: certificate name coverage, and HTTP security headers."""
+    out: list[Detection] = []
+
+    if script.id == "ssl-cert" and host.hostnames:
+        cert = scriptdata.parse_certificate(script.output)
+        if cert and cert.names() and not any(cert.covers(h) for h in host.hostnames):
+            out.append(
+                Detection(
+                    "TLS_CERT_HOSTNAME_MISMATCH",
+                    f"certificate names {cert.names()} do not cover {host.hostnames}",
+                    "firm",
+                )
+            )
+
+    if script.id == "http-headers":
+        names = scriptdata.http_header_names(script.output)
+        if names:  # only judge when we actually parsed the response headers
+            tls = bool(port and (port.service.tunnel == "ssl"
+                                 or "https" in (port.service.name or "")))
+            if tls and "strict-transport-security" not in names:
+                out.append(Detection("HTTP_MISSING_HSTS", "no Strict-Transport-Security header",
+                                     "confirmed"))
+            if "content-security-policy" not in names:
+                out.append(Detection("HTTP_MISSING_CSP", "no Content-Security-Policy header",
+                                     "confirmed"))
+    return out
+
+
 def _apply_rules(
     scripts: list[Script], host: Host, port: Optional[Port], scan: ScanRun
 ) -> list[Weakness]:
@@ -865,6 +921,14 @@ def _apply_rules(
                         detection.severity,
                     )
                 )
+
+        # Checks that need the host or the port alongside the script.
+        for detection in _host_aware_detections(script, host, port):
+            matched_specific = True
+            out.append(
+                _weakness(detection.rule_id, host, port, scan, script.id,
+                          detection.evidence, detection.confidence, detection.severity)
+            )
 
         for rule in ALL_RULES:
             if rule.scripts and script.id not in rule.scripts:
