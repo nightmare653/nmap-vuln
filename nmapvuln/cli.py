@@ -17,6 +17,7 @@ from .report import (
     write_html,
     write_json,
     write_markdown,
+    write_coverage_csv,
     write_validation_csv,
     write_weakness_csv,
 )
@@ -302,6 +303,7 @@ def main(argv: list[str] | None = None) -> int:
     csv_path = write_csv(analysis, base + "-findings.csv")
     weak_path = write_weakness_csv(analysis, base + "-weaknesses.csv")
     val_path = write_validation_csv(analysis, base + "-validation.csv")
+    cov_path = write_coverage_csv(analysis, base + "-coverage.csv")
     enum_path = ""
     if not args.no_playbook:
         enum_path = write_enumeration_csv(analysis, base + "-enumeration.csv")
@@ -321,6 +323,10 @@ def main(argv: list[str] | None = None) -> int:
           f"{weak['CRITICAL']} critical, {weak['HIGH']} high, "
           f"{weak['MEDIUM']} medium, {weak['LOW']} low", file=sys.stderr)
     print(f"[+] scan validation: {errors} error(s), {warns} warning(s)", file=sys.stderr)
+    from .report import coverage as _coverage_fn
+    _cov, _ = _coverage_fn(analysis)
+    print(f"[+] coverage: {_cov['scanned']} IP(s) scanned, {_cov['up']} up "
+          f"({_cov['with_open']} with open ports), {_cov['down']} down", file=sys.stderr)
     for reason, count in sorted(analysis.suppressed.items(), key=lambda kv: -kv[1]):
         print(f"[~] withheld {count} {reason}", file=sys.stderr)
     kev_count = sum(1 for f in analysis.findings if f.kev)
@@ -337,6 +343,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[+] {csv_path}", file=sys.stderr)
     print(f"[+] {weak_path}", file=sys.stderr)
     print(f"[+] {val_path}", file=sys.stderr)
+    print(f"[+] {cov_path}", file=sys.stderr)
     if enum_path:
         print(f"[+] {enum_path}", file=sys.stderr)
     print(f"[+] {md_path}", file=sys.stderr)

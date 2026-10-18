@@ -274,6 +274,7 @@ Open `report.html` and use the tabs across the top:
 | **Service KB** | A deep per-service knowledge base (what to try, what to expect) for 33 services. Services you found are expanded first; the rest are searchable below. |
 | **Network Attacks** | Network-wide techniques (LLMNR poisoning, mitm6, VLAN hopping, …). A "Relevant to this scan" group at the top shows which ones your scan gives evidence for, and why. |
 | **Per-host** | Everything about one host — its ports, CVEs, weaknesses and leads — in one place. |
+| **Coverage** | Every IP you scanned and whether it gave anything back — **including down hosts and hosts with no open ports**, which the inventory leaves out. Counts of scanned / up / down / with-open, and a sortable, exportable per-IP table. Use it to confirm you actually covered the range. |
 | **Inventory** | Every host and open port found, with an **Export CSV** button. |
 
 Two ideas that make the report trustworthy:
@@ -314,6 +315,7 @@ All written into your `-o` folder:
 | `report-findings.csv` | One row per host/port/CVE (with KEV flag, EPSS, CISA due date). |
 | `report-weaknesses.csv` | One row per non-CVE weakness, with evidence and a fix. |
 | `report-validation.csv` | One row per scan-quality issue. |
+| `report-coverage.csv` | One row per scanned IP: status (up/down) and whether anything was open. |
 | `report-enumeration.csv` | One row per enumeration step, commands filled in. (Skipped with `--no-playbook`.) |
 
 ---
@@ -461,7 +463,7 @@ The report includes reference material to help you act on findings:
 python tests/test_nmapvuln.py
 ```
 
-165 tests covering the parsers, CVE matching, the weakness rules, the knowledge
+170 tests covering the parsers, CVE matching, the weakness rules, the knowledge
 banks, the exports, and one regression test for every false positive the tool has
 ever produced. No test touches the network. Test fixtures live in `samples/` and
 can be rebuilt with `python tests/make_samples.py`.

@@ -1392,6 +1392,56 @@ class TestNewWeaknessRules(unittest.TestCase):
         self.assertIn("NTP_MONLIST", ids)
 
 
+class TestCoverage(unittest.TestCase):
+    def _analysis(self, *hosts):
+        a = Analysis()
+        a.scans.append(ScanRun(source="x", fmt="xml", hosts=list(hosts)))
+        return a
+
+    def test_counts_and_statuses_including_down(self):
+        from nmapvuln.report import coverage
+        up_open = Host(address="10.0.0.1", status="up")
+        up_open.ports.append(Port(portid=22, state="open", service=Service(name="ssh")))
+        up_filtered = Host(address="10.0.0.2", status="up", extraports={"filtered": 1000})
+        down = Host(address="10.0.0.3", status="down")
+        totals, rows = coverage(self._analysis(up_open, up_filtered, down))
+        self.assertEqual(totals["scanned"], 3)
+        self.assertEqual(totals["up"], 2)
+        self.assertEqual(totals["down"], 1)
+        self.assertEqual(totals["with_open"], 1)
+        states = {r["ip"]: r["state"] for r in rows}
+        self.assertEqual(states["10.0.0.1"], "open")
+        self.assertEqual(states["10.0.0.2"], "filtered")
+        self.assertEqual(states["10.0.0.3"], "down")
+
+    def test_down_host_is_surfaced_unlike_inventory(self):
+        # The inventory drops down hosts; coverage must keep them.
+        from nmapvuln.report import coverage
+        totals, rows = coverage(self._analysis(Host(address="1.2.3.4", status="down")))
+        self.assertEqual([r["ip"] for r in rows], ["1.2.3.4"])
+        self.assertEqual(totals["down"], 1)
+
+    def test_ips_sort_numerically(self):
+        from nmapvuln.report import coverage
+        hosts = [Host(address=f"10.0.0.{n}", status="down") for n in (10, 2, 1)]
+        _t, rows = coverage(self._analysis(*hosts))
+        self.assertEqual([r["ip"] for r in rows], ["10.0.0.1", "10.0.0.2", "10.0.0.10"])
+
+    def test_coverage_csv_and_tab(self):
+        from nmapvuln.report import write_coverage_csv, write_html
+        a = Analysis()
+        a.scans.extend(parse_file(os.path.join(SAMPLES, "sample.xml")))
+        with tempfile.TemporaryDirectory() as tmp:
+            csvp = write_coverage_csv(a, os.path.join(tmp, "c.csv"))
+            body = open(csvp, encoding="utf-8").read()
+            htmlp = write_html(a, os.path.join(tmp, "r.html"))
+            html = open(htmlp, encoding="utf-8").read()
+        self.assertIn("status", body)
+        self.assertIn("10.10.10.6", body)  # the up-but-filtered host
+        self.assertIn('id="tab-coverage"', html)
+        self.assertIn("Scan coverage", html)
+
+
 class TestUiControls(unittest.TestCase):
     def _html(self):
         analysis = Analysis()
@@ -1410,6 +1460,14 @@ class TestUiControls(unittest.TestCase):
         html = self._html()
         self.assertIn('class="nowrap sortable"', html)
         self.assertIn("@media print", html)
+
+    def test_command_blocks_wrap_not_scroll(self):
+        # The copy-button overlap fix: command code wraps (pre-wrap, reserved
+        # right padding) and the old horizontally-scrolling pre is gone.
+        html = self._html()
+        self.assertNotIn("pre.htcmd", html)
+        self.assertIn("white-space:pre-wrap", html)
+        self.assertIn("padding:9px 58px", html)  # reserved gutter for the copy button
 
 
 if __name__ == "__main__":

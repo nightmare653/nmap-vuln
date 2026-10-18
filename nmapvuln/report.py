@@ -146,8 +146,21 @@ def write_validation_csv(analysis: Analysis, path: str) -> str:
     return path
 
 
+def write_coverage_csv(analysis: Analysis, path: str) -> str:
+    """One row per scanned IP: status and whether anything was open."""
+    os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
+    _totals, rows = coverage(analysis)
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(["ip", "hostnames", "status", "open_ports", "result"])
+        for r in rows:
+            writer.writerow([r["ip"], r["hostnames"], r["status"], r["open"], r["label"]])
+    return path
+
+
 def _analysis_dict(analysis: Analysis) -> dict:
     """The whole analysis as plain data, for JSON/Markdown export."""
+    cov_totals, cov_rows = coverage(analysis)
     inventory = []
     for address, hostnames, host_ports in _merge_hosts(analysis):
         for port in host_ports:
@@ -162,11 +175,16 @@ def _analysis_dict(analysis: Analysis) -> dict:
         "generated": datetime.datetime.now().isoformat(timespec="seconds"),
         "summary": {
             "scan_files": len(analysis.scans),
+            "ips_scanned": cov_totals["scanned"],
+            "hosts_up": cov_totals["up"],
+            "hosts_down": cov_totals["down"],
+            "hosts_with_open_ports": cov_totals["with_open"],
             "live_hosts": sum(1 for h in analysis.hosts if h.status != "down"),
             "findings": len(analysis.findings),
             "weaknesses": len(analysis.weaknesses),
             "severity_counts": analysis.combined_counts(),
         },
+        "coverage": cov_rows,
         "scans": [{"source": os.path.basename(s.source), "format": s.fmt,
                    "nmap_version": s.nmap_version, "args": s.args,
                    "completed": s.completed, "hosts": len(s.hosts)} for s in analysis.scans],
@@ -224,6 +242,16 @@ def write_markdown(analysis: Analysis, path: str,
     out.append("")
     out.append(f"**Severity (combined):** {c['CRITICAL']} critical · {c['HIGH']} high · "
                f"{c['MEDIUM']} medium · {c['LOW']} low")
+    out.append("")
+
+    cov_t, cov_rows = coverage(analysis)
+    out += ["## Scan coverage", ""]
+    out.append(f"{cov_t['scanned']} IP(s) scanned · {cov_t['up']} up · {cov_t['down']} down · "
+               f"{cov_t['with_open']} with open ports · {cov_t['no_open']} up with nothing open")
+    out.append("")
+    out.append(_md_table(["IP", "Hostnames", "Status", "Open", "Result"],
+                         [[r["ip"], r["hostnames"], r["status"], r["open"], r["label"]]
+                          for r in cov_rows]))
     out.append("")
 
     if analysis.issues:
@@ -415,8 +443,7 @@ table.kb-tbl{width:100%;border-collapse:collapse;table-layout:fixed}
 table.kb-tbl td{vertical-align:top;padding:7px 8px;border-top:1px solid var(--line);
   font-size:13px;overflow-wrap:anywhere}
 table.kb-tbl td.m{width:22%;font-weight:600}
-table.kb-tbl code{white-space:pre-wrap;overflow-wrap:anywhere;display:block;
-  background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:5px 7px;margin:2px 0}
+table.kb-tbl td.m{padding-top:10px}
 .kb-note{color:var(--muted)} .kb-note a{color:var(--accent)}
 .warnbar{border:1px solid var(--high);background:var(--high-bg);color:var(--high);
   border-radius:7px;padding:9px 12px;font-size:13px;margin:6px 0 12px}
@@ -429,8 +456,15 @@ a.kblink:hover{text-decoration:none;border-bottom-style:solid}
 .expbtn,.copybtn{appearance:none;border:1px solid var(--line);background:var(--chip);
   color:var(--muted);border-radius:6px;cursor:pointer;font-size:12px;padding:4px 10px}
 .expbtn:hover,.copybtn:hover{color:var(--accent);border-color:var(--accent)}
-.cmdwrap{position:relative}
-.copybtn{position:absolute;top:4px;right:4px;padding:2px 8px;font-size:11px;opacity:.75}
+/* Every command block: wraps so the whole command is readable, with the copy
+   button in a reserved top-right gutter so it never overlaps the text. */
+.cmdwrap{position:relative;display:block;margin:5px 0}
+.cmdwrap code{display:block;white-space:pre-wrap;overflow-wrap:anywhere;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;
+  line-height:1.6;background:var(--bg);border:1px solid var(--line);border-radius:7px;
+  padding:9px 58px 9px 11px}
+.copybtn{position:absolute;top:6px;right:7px;padding:3px 9px;font-size:11px;
+  background:var(--panel);color:var(--muted);opacity:.92;z-index:1}
 .copybtn:hover{opacity:1}
 .copybtn.ok{color:var(--low);border-color:var(--low)}
 .srctag{display:inline-block;margin-left:4px;padding:0 7px;border-radius:9px;font-size:11px;
@@ -439,9 +473,6 @@ a.kblink:hover{text-decoration:none;border-bottom-style:solid}
   border-radius:7px;padding:8px 10px;background:var(--chip)}
 .htlabel{font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
   color:var(--accent);margin-bottom:4px}
-pre.htcmd{position:relative;margin:5px 0;overflow-x:auto;background:var(--bg);
-  border:1px solid var(--line);border-radius:5px;padding:7px 9px}
-pre.htcmd code{white-space:pre;font-size:12.5px}
 .htcredit{margin-top:6px;font-size:11.5px;color:var(--muted)}
 .htcredit a{color:var(--accent)}
 .navbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 12px;
@@ -891,7 +922,7 @@ def _ht_section_html(ht: dict, subst: Optional[tuple[str, int]]) -> str:
             parts.append(f'<div class="phase-head">{_esc(heading)}</div>')
         for cmd in section.get("commands", []):
             text = knowledge.substitute(cmd, subst[0], subst[1]) if subst else cmd
-            parts.append(f'<pre class="htcmd"><code>{_esc(text)}</code></pre>')
+            parts.append(f'<code>{_esc(text)}</code>')
     ref = ht.get("reference")
     credit = (
         '<div class="htcredit">Source: '
@@ -1094,6 +1125,107 @@ def _triage_block(analysis: Analysis) -> str:
     return "".join(blocks)
 
 
+def _ip_sort_key(ip: str):
+    parts = ip.split(".")
+    if len(parts) == 4 and all(p.isdigit() for p in parts):
+        return (0, tuple(int(p) for p in parts), "")
+    return (1, (), ip)
+
+
+def coverage(analysis: Analysis) -> tuple[dict, list[dict]]:
+    """Every IP that appears in the scans, with its status.
+
+    Answers 'how many IPs did I scan, and which gave anything'. Unlike the
+    inventory, this includes hosts that were **down** or came back with no open
+    ports — the whole point is to confirm coverage, not just list findings.
+    """
+    acc: dict[str, dict] = {}
+    for host in analysis.hosts:
+        ip = host.address or (host.addresses[0] if host.addresses else "")
+        if not ip:
+            continue
+        rec = acc.setdefault(ip, {"hostnames": [], "up": False, "open": set(), "filtered": 0})
+        for n in host.hostnames:
+            if n not in rec["hostnames"]:
+                rec["hostnames"].append(n)
+        if (host.status or "").lower() != "down":
+            if host.open_ports or host.extraports or (host.status or "").lower() == "up":
+                rec["up"] = True
+        for p in host.open_ports:
+            rec["open"].add(p.key)
+        rec["filtered"] = max(rec["filtered"], host.extraports.get("filtered", 0))
+
+    totals = {"scanned": 0, "up": 0, "down": 0, "with_open": 0, "no_open": 0}
+    rows = []
+    for ip in sorted(acc, key=_ip_sort_key):
+        rec = acc[ip]
+        totals["scanned"] += 1
+        n_open = len(rec["open"])
+        if rec["up"]:
+            totals["up"] += 1
+            if n_open:
+                state, label = "open", f"{n_open} open port(s)"
+                totals["with_open"] += 1
+            elif rec["filtered"]:
+                state, label = "filtered", "all probed ports filtered"
+                totals["no_open"] += 1
+            else:
+                state, label = "noopen", "no open ports"
+                totals["no_open"] += 1
+            status = "up"
+        else:
+            totals["down"] += 1
+            status, state, label = "down", "down", "host down / no response"
+        rows.append({"ip": ip, "hostnames": ", ".join(rec["hostnames"]),
+                     "status": status, "state": state, "open": n_open, "label": label})
+    return totals, rows
+
+
+_COVERAGE_BADGE = {
+    "open": ("b-LOW", "has open ports"),
+    "filtered": ("b-MEDIUM", "all filtered"),
+    "noopen": ("b-UNKNOWN", "no open ports"),
+    "down": ("b-HIGH", "down"),
+}
+
+
+def _coverage_block(analysis: Analysis) -> str:
+    totals, rows = coverage(analysis)
+    if not rows:
+        return '<div class="empty">No hosts were parsed from the scan(s).</div>'
+
+    summary = (
+        f'<div class="cards" style="margin:4px 0 14px">'
+        f'<div class="card"><div class="n">{totals["scanned"]}</div><div class="l">IPs scanned</div></div>'
+        f'<div class="card"><div class="n">{totals["up"]}</div><div class="l">Up</div></div>'
+        f'<div class="card"><div class="n">{totals["down"]}</div><div class="l">Down</div></div>'
+        f'<div class="card low"><div class="n">{totals["with_open"]}</div><div class="l">With open ports</div></div>'
+        f'<div class="card"><div class="n">{totals["no_open"]}</div><div class="l">Up, nothing open</div></div>'
+        f'</div>'
+    )
+    body = []
+    for r in rows:
+        cls, _text = _COVERAGE_BADGE.get(r["state"], ("b-UNKNOWN", r["state"]))
+        body.append(
+            f'<tr><td class="nowrap">{_esc(r["ip"])}</td>'
+            f'<td>{_esc(r["hostnames"]) or "&nbsp;"}</td>'
+            f'<td class="nowrap"><span class="badge {cls}">{_esc(r["status"].upper())}</span></td>'
+            f'<td class="nowrap">{r["open"] if r["open"] else "—"}</td>'
+            f'<td>{_esc(r["label"])}</td></tr>'
+        )
+    table = (
+        '<div class="tbar"><button class="expbtn" data-table="coverage" '
+        'data-file="coverage.csv">⬇ Export CSV</button></div>'
+        '<div class="tablewrap"><table id="coverage"><thead><tr>'
+        '<th class="sortable" data-sort="num">IP</th>'
+        '<th class="sortable" data-sort="text">Hostnames</th>'
+        '<th class="nowrap sortable" data-sort="text">Status</th>'
+        '<th class="nowrap sortable" data-sort="num">Open ports</th>'
+        '<th>Result</th></tr></thead><tbody>' + "".join(body) + "</tbody></table></div>"
+    )
+    return summary + table
+
+
 def _merge_hosts(analysis: Analysis) -> list[tuple[str, list[str], list]]:
     """Collapse the same host seen in several scan files into one inventory entry.
 
@@ -1248,6 +1380,7 @@ def write_html(
     n_enum = len(build_playbook(analysis.hosts)) if include_playbook else 0
     n_kb = sum(1 for c in knowledge.merged_service_cards(analysis.hosts) if c["detected"])
     n_net = len(knowledge.network_bank().get("topics", []))
+    cov_totals, _cov_rows = coverage(analysis)
 
     def tab_btn(tab_id: str, label: str, pill=None) -> str:
         p = f' <span class="pill">{pill}</span>' if pill is not None else ""
@@ -1272,6 +1405,7 @@ def write_html(
         + tab_btn("tab-kb", "Service KB", n_kb)
         + tab_btn("tab-net", "Network Attacks", n_net)
         + tab_btn("tab-host", "Per-host", len(live))
+        + tab_btn("tab-coverage", "Coverage", cov_totals["scanned"])
         + tab_btn("tab-inv", "Inventory")
     )
 
@@ -1282,7 +1416,8 @@ def write_html(
       <div class="brand">
         <h1><span class="dot"></span>{_esc(title)}</h1>
         <div class="meta">Generated {generated} · {len(analysis.scans)} scan file(s) ·
-           {len(live)} live host(s) · {open_ports} open port(s) · {_esc(mode)}</div>
+           {cov_totals['scanned']} IP(s) scanned · {len(live)} live host(s) ·
+           {open_ports} open port(s) · {_esc(mode)}</div>
       </div>
       <div class="tools">
         <label class="search">
@@ -1436,6 +1571,14 @@ def write_html(
       <span class="navcount" id="hostcount"></span>
     </div>
     {_triage_block(analysis)}
+  </div>
+
+  <div class="panel-tab" id="tab-coverage">
+    <h2>Scan coverage</h2>
+    <p class="note">Every IP that appeared in the scan and whether it gave anything back —
+       including hosts that were <strong>down</strong> or had no open ports, which the
+       inventory leaves out. Use it to confirm you actually covered the range.</p>
+    {_coverage_block(analysis)}
   </div>
 
   <div class="panel-tab" id="tab-inv">
