@@ -273,7 +273,8 @@ Open `report.html` and use the tabs across the top:
 | **Enumeration** | For each open port, the exact commands to run next to confirm a finding, with the host and port already filled in. Every command has a **copy** button. |
 | **Service KB** | A deep per-service knowledge base (what to try, what to expect) for 33 services. Services you found are expanded first; the rest are searchable below. |
 | **Network Attacks** | Network-wide techniques (LLMNR poisoning, mitm6, VLAN hopping, …). A "Relevant to this scan" group at the top shows which ones your scan gives evidence for, and why. |
-| **Per-host** | Everything about one host — its ports, CVEs, weaknesses and leads — in one place. |
+| **Per-host** | Everything about one host — its ports, CVEs, weaknesses, **attacks to try** (concrete techniques per open service), and network leads — in one place. |
+| **Nmap Results** | The **complete, unfiltered output of every NSE script** nmap ran, per host and port, plus OS detection — everything the scan itself discovered. CVEs and VULNERABLE verdicts are highlighted, with a summary of how many of each nmap reported. This is the raw material the other tabs are built from. |
 | **Coverage** | Every IP you scanned and whether it gave anything back — **including down hosts and hosts with no open ports**, which the inventory leaves out. Counts of scanned / up / down / with-open, and a sortable, exportable per-IP table. Use it to confirm you actually covered the range. |
 | **Inventory** | Every host and open port found, with an **Export CSV** button. |
 
@@ -463,7 +464,7 @@ The report includes reference material to help you act on findings:
 python tests/test_nmapvuln.py
 ```
 
-170 tests covering the parsers, CVE matching, the weakness rules, the knowledge
+176 tests covering the parsers, CVE matching, the weakness rules, the knowledge
 banks, the exports, and one regression test for every false positive the tool has
 ever produced. No test touches the network. Test fixtures live in `samples/` and
 can be rebuilt with `python tests/make_samples.py`.

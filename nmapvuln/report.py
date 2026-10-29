@@ -6,9 +6,10 @@ import csv
 import datetime
 import html
 import os
+import re
 
 from . import knowledge
-from .model import Analysis, Finding, Port, Service
+from .model import CVE_RE, Analysis, Finding, Port, Service
 from .playbook import build as build_playbook
 
 
@@ -484,6 +485,24 @@ a.kblink:hover{text-decoration:none;border-bottom-style:solid}
   border-radius:8px;cursor:pointer;font-size:12.5px;padding:7px 12px;white-space:nowrap}
 .minibtn:hover{color:var(--accent);border-color:var(--accent)}
 .navcount{font-size:12.5px;color:var(--muted)}
+/* --- raw nmap script output --- */
+.nse-os{font-size:13px;margin:4px 0 8px;color:var(--muted)}
+.nse-port{font-size:12.5px;font-weight:700;color:var(--accent);margin:12px 0 4px;
+  border-bottom:1px solid var(--line);padding-bottom:3px}
+.nse-script{margin:6px 0 10px}
+.nse-id{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;
+  color:var(--muted);margin-bottom:3px}
+pre.nse{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.5;margin:0;
+  background:var(--bg);border:1px solid var(--line);border-left:3px solid var(--line);
+  border-radius:6px;padding:8px 11px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.hl-vuln{color:var(--crit);font-weight:700}
+.hl-maybe{color:var(--high);font-weight:600}
+.hl-cve{color:var(--accent);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+a.cvechip{font-size:11.5px;padding:2px 8px;border-radius:999px;background:var(--crit-bg);
+  color:var(--crit);text-decoration:none;font-weight:600}
+a.cvechip:hover{text-decoration:underline}
 /* --- app header: brand, global search, theme toggle, tabs --- */
 .apphead{position:sticky;top:0;z-index:20;background:var(--bg);
   margin:-32px -20px 16px;padding:14px 20px 0;border-bottom:1px solid var(--line);box-shadow:var(--shadow)}
@@ -685,6 +704,7 @@ JS = """
     var t=(gq.value||'').toLowerCase();
     subs.forEach(function(el){if(el){el.value=t;el.dispatchEvent(new Event('input'));}});
     filt('#tab-enum details.pb',t); filt('#tab-net details.kb',t); filt('#tab-inv #inventory tbody tr',t);
+    filt('#tab-nmap details.kb',t); filt('#tab-coverage #coverage tbody tr',t);
     if(!t){ for(var k in pills)pills[k].el.textContent=pills[k].orig; return; }
     setPill('tab-cve',vis('#findings tbody tr[data-sev]'));
     setPill('tab-weak',vis('#weaknesses tbody tr[data-wsev]'));
@@ -692,6 +712,7 @@ JS = """
     setPill('tab-net',vis('#tab-net details.kb'));
     setPill('tab-kb',vis('#tab-kb details.kb'));
     setPill('tab-host',vis('#tab-host details.kb'));
+    setPill('tab-nmap',vis('#tab-nmap details.kb'));
   }
   gq.addEventListener('input',run);
 })();
@@ -1070,6 +1091,158 @@ def _followup_block(analysis: Analysis) -> str:
     )
 
 
+def _nmap_script_data(analysis: Analysis) -> dict:
+    """Per host: hostnames, OS guesses, host scripts and per-port scripts, merged
+    across scan files (deduplicated on script id + output)."""
+    acc: dict[str, dict] = {}
+    for host in analysis.hosts:
+        addr = host.address or (host.addresses[0] if host.addresses else "")
+        if not addr:
+            continue
+        rec = acc.setdefault(addr, {"hostnames": [], "os": [], "host_scripts": [],
+                                    "ports": {}, "_seen": set()})
+        for n in host.hostnames:
+            if n not in rec["hostnames"]:
+                rec["hostnames"].append(n)
+        for om in host.os_matches:
+            if om not in rec["os"]:
+                rec["os"].append(om)
+        for s in host.scripts:
+            key = ("host", s.id, s.output)
+            if s.output and key not in rec["_seen"]:
+                rec["_seen"].add(key)
+                rec["host_scripts"].append(s)
+        for port in host.open_ports:
+            slot = rec["ports"].setdefault(port.key, {"port": port, "scripts": []})
+            if len(port.service.banner) > len(slot["port"].service.banner):
+                slot["port"] = port
+            for s in port.scripts:
+                key = (port.key, s.id, s.output)
+                if s.output and key not in rec["_seen"]:
+                    rec["_seen"].add(key)
+                    slot["scripts"].append(s)
+    return acc
+
+
+def _highlight_nse(text: str) -> str:
+    """Escape raw script output, then highlight CVEs and VULNERABLE verdicts."""
+    out = _esc(text)
+    out = re.sub(r"(CVE-\d{4}-\d{4,7})", r'<span class="hl-cve">\1</span>', out, flags=re.I)
+    out = re.sub(r"(VULNERABLE[^\n<]*)", r'<span class="hl-vuln">\1</span>', out)
+    out = re.sub(r"(?m)^(\s*)(State:\s*)(LIKELY VULNERABLE|NOT VULNERABLE)",
+                 r"\1\2<span class='hl-maybe'>\3</span>", out)
+    return out
+
+
+def _render_script(s) -> str:
+    return (f'<div class="nse-script"><div class="nse-id">{_esc(s.id)}</div>'
+            f'<pre class="nse">{_highlight_nse(s.output)}</pre></div>')
+
+
+def _nmap_results_block(analysis: Analysis) -> str:
+    """The complete NSE script output nmap produced, per host and port, plus the
+    OS guesses — i.e. everything the scan actually discovered, unfiltered."""
+    data = _nmap_script_data(analysis)
+
+    all_scripts = [s for rec in data.values()
+                   for s in rec["host_scripts"]
+                   + [sc for p in rec["ports"].values() for sc in p["scripts"]]]
+    if not all_scripts and not any(rec["os"] for rec in data.values()):
+        return ('<div class="empty">No NSE script output in these scans. Re-run nmap with '
+                '<code>-sC</code> (default scripts) or <code>--script …</code> to populate this '
+                'view.</div>')
+
+    blob = "\n".join(s.output for s in all_scripts)
+    cves = sorted({m.upper() for m in CVE_RE.findall(blob)})
+    vuln_hits = sum(1 for s in all_scripts if "VULNERABLE" in s.output.upper()
+                    and "NOT VULNERABLE" not in s.output.upper())
+    cve_line = ""
+    if cves:
+        chips = " ".join(
+            f'<a class="cvechip" href="https://nvd.nist.gov/vuln/detail/{_esc(c)}" '
+            f'target="_blank" rel="noopener">{_esc(c)}</a>' for c in cves[:40])
+        cve_line = (f'<p class="note"><strong>{len(cves)} CVE(s)</strong> referenced by '
+                    f"nmap's own scripts:</p><div class=\"chips\">{chips}</div>")
+
+    summary = (
+        '<div class="panel"><p class="note" style="margin:0">'
+        f"nmap ran <strong>{len(all_scripts)}</strong> script(s) across "
+        f"<strong>{sum(1 for r in data.values() if r['host_scripts'] or any(p['scripts'] for p in r['ports'].values()))}</strong> "
+        f"host(s). Its scripts flagged <strong>{vuln_hits}</strong> result(s) as VULNERABLE"
+        + (f" and reference <strong>{len(cves)}</strong> CVE(s)." if cves else ".")
+        + f"</p>{cve_line}</div>"
+    )
+
+    blocks = [summary]
+    for addr in sorted(data, key=_ip_sort_key):
+        rec = data[addr]
+        n = len(rec["host_scripts"]) + sum(len(p["scripts"]) for p in rec["ports"].values())
+        if n == 0 and not rec["os"]:
+            continue
+        inner = []
+        if rec["os"]:
+            inner.append(f'<div class="nse-os"><strong>OS detection:</strong> '
+                         f'{_esc(", ".join(rec["os"][:4]))}</div>')
+        if rec["host_scripts"]:
+            inner.append('<div class="nse-port">Host scripts</div>')
+            inner += [_render_script(s) for s in rec["host_scripts"]]
+        for key in sorted(rec["ports"], key=lambda k: (int(k.split("/")[0]), k)):
+            slot = rec["ports"][key]
+            if not slot["scripts"]:
+                continue
+            inner.append(f'<div class="nse-port">{_esc(key)} &mdash; '
+                         f'{_esc(slot["port"].service.banner)}</div>')
+            inner += [_render_script(s) for s in slot["scripts"]]
+        names = (f' <span class="where">{_esc(", ".join(rec["hostnames"]))}</span>'
+                 if rec["hostnames"] else "")
+        vmark = ' <span class="srctag" style="background:var(--crit)">VULN</span>' if any(
+            "VULNERABLE" in s.output.upper() and "NOT VULNERABLE" not in s.output.upper()
+            for s in rec["host_scripts"] + [sc for p in rec["ports"].values() for sc in p["scripts"]]
+        ) else ""
+        blocks.append(
+            f'<details class="kb"><summary>{_esc(addr)}{names} '
+            f'<span class="where">{n} script(s)</span>{vmark}</summary>'
+            f'<div class="kb-body">{"".join(inner)}</div></details>'
+        )
+    return "".join(blocks)
+
+
+# Phases/headings that describe an actual attack rather than enumeration.
+_ATTACK_WORDS = ("exploit", "brute", "attack", "rce", "privilege", "dump", "unauth",
+                 "bypass", "inject", "poison", "relay", "takeover", "password")
+
+
+def _attacks_for_port(port: Port) -> list[str]:
+    """Clean attack-phase technique names from the knowledge bank for one port.
+
+    Only short, single-line method names are kept — the spreadsheet puts whole
+    payloads in some method cells, and those are noise in a summary list.
+    """
+    names: list[str] = []
+    entry = knowledge.for_port(port)
+    if entry:
+        for row in entry.get("rows", []):
+            method = (row.get("method") or "").strip()
+            label = (row.get("phase", "") + " " + method).lower()
+            if (method and "\n" not in method and len(method) <= 52
+                    and any(w in label for w in _ATTACK_WORDS)):
+                names.append(method)
+    ht = knowledge.hacktricks_for_port(port)
+    if ht:
+        for sec in ht.get("sections", []):
+            head = (sec.get("heading") or "").strip()
+            if head and len(head) <= 52 and any(w in head.lower() for w in _ATTACK_WORDS):
+                names.append(head)
+    # de-dupe, keep order
+    seen, out = set(), []
+    for n in names:
+        k = n.lower()
+        if k not in seen:
+            seen.add(k)
+            out.append(n)
+    return out
+
+
 def _triage_block(analysis: Analysis) -> str:
     """Everything for one host in one place: findings, weaknesses, open ports, leads."""
     rel_by_host: dict[str, list[str]] = {}
@@ -1095,10 +1268,20 @@ def _triage_block(analysis: Analysis) -> str:
 
         # Open ports with KB links.
         port_bits = []
+        attack_bits = []
         for port in host_ports:
             cell = _port_cell(port.key, port.service.name)
             port_bits.append(f"<li>{cell} — {_esc(port.service.banner)}</li>")
+            attacks = _attacks_for_port(port)
+            if attacks:
+                shown = ", ".join(_esc(a) for a in attacks[:5])
+                more = f" <span class='where'>(+{len(attacks) - 5} more)</span>" if len(attacks) > 5 else ""
+                attack_bits.append(
+                    f"<li>{cell} <span class='where'>{_esc(port.service.name)}</span>: "
+                    f"{shown}{more}</li>")
         ports_html = f'<strong>Open ports</strong><ul class="tight">{"".join(port_bits)}</ul>' if port_bits else ""
+        attacks_html = (f'<strong>Attacks to try</strong><ul class="tight">{"".join(attack_bits)}</ul>'
+                        if attack_bits else "")
 
         # Findings and weaknesses, compact.
         fw = []
@@ -1120,7 +1303,7 @@ def _triage_block(analysis: Analysis) -> str:
         blocks.append(
             f'<details class="kb"{open_attr}><summary>{_esc(address)}{names} '
             f'<span class="where">{len(host_ports)} ports · {n_f} CVE · {n_w} weakness</span>'
-            f'</summary><div class="kb-body">{ports_html}{fw_html}{leads_html}</div></details>'
+            f'</summary><div class="kb-body">{ports_html}{fw_html}{attacks_html}{leads_html}</div></details>'
         )
     return "".join(blocks)
 
@@ -1381,6 +1564,9 @@ def write_html(
     n_kb = sum(1 for c in knowledge.merged_service_cards(analysis.hosts) if c["detected"])
     n_net = len(knowledge.network_bank().get("topics", []))
     cov_totals, _cov_rows = coverage(analysis)
+    n_scripts = sum(len([s for s in h.scripts if s.output])
+                    + sum(len([s for s in p.scripts if s.output]) for p in h.open_ports)
+                    for h in analysis.hosts)
 
     def tab_btn(tab_id: str, label: str, pill=None) -> str:
         p = f' <span class="pill">{pill}</span>' if pill is not None else ""
@@ -1405,6 +1591,7 @@ def write_html(
         + tab_btn("tab-kb", "Service KB", n_kb)
         + tab_btn("tab-net", "Network Attacks", n_net)
         + tab_btn("tab-host", "Per-host", len(live))
+        + tab_btn("tab-nmap", "Nmap Results", n_scripts)
         + tab_btn("tab-coverage", "Coverage", cov_totals["scanned"])
         + tab_btn("tab-inv", "Inventory")
     )
@@ -1571,6 +1758,19 @@ def write_html(
       <span class="navcount" id="hostcount"></span>
     </div>
     {_triage_block(analysis)}
+  </div>
+
+  <div class="panel-tab" id="tab-nmap">
+    <h2>Nmap script results</h2>
+    <p class="note">The complete, unfiltered output of every NSE script nmap ran, per host and
+       port, plus OS detection — everything the scan itself discovered. CVEs and VULNERABLE
+       verdicts are highlighted. This is the raw material the findings and weakness tabs are
+       built from; here you see all of it.</p>
+    <div class="navbar">
+      <button class="minibtn" data-act="expand" data-scope="tab-nmap">Expand all</button>
+      <button class="minibtn" data-act="collapse" data-scope="tab-nmap">Collapse all</button>
+    </div>
+    {_nmap_results_block(analysis)}
   </div>
 
   <div class="panel-tab" id="tab-coverage">

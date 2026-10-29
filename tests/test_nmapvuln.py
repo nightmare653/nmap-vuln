@@ -1442,6 +1442,57 @@ class TestCoverage(unittest.TestCase):
         self.assertIn("Scan coverage", html)
 
 
+class TestNmapResults(unittest.TestCase):
+    def _html(self, sample):
+        from nmapvuln.report import write_html
+        a = Analysis()
+        a.scans.extend(parse_file(os.path.join(SAMPLES, sample)))
+        with tempfile.TemporaryDirectory() as tmp:
+            p = write_html(a, os.path.join(tmp, "r.html"))
+            return open(p, encoding="utf-8").read()
+
+    def test_tab_and_raw_output_present(self):
+        html = self._html("sample-scripts.xml")
+        self.assertIn('id="tab-nmap"', html)
+        self.assertIn("Nmap script results", html)
+        # a raw script id and a chunk of its full output appear verbatim
+        self.assertIn("ssl-dh-params", html)
+        self.assertIn("Modulus Length", html)
+
+    def test_vulnerable_highlighted(self):
+        # sample-scripts.xml carries VULNERABLE verdicts (heartbleed, dh-params).
+        self.assertIn('class="hl-vuln"', self._html("sample-scripts.xml"))
+
+    def test_cve_highlighted_and_summarised(self):
+        # sample.xml carries an NSE vulners CVE list.
+        html = self._html("sample.xml")
+        self.assertIn('class="hl-cve"', html)
+        self.assertIn("referenced by nmap", html)  # the summary line
+
+    def test_no_scripts_message(self):
+        html = self._html("sample.gnmap")  # greppable has no NSE output
+        self.assertIn("No NSE script output", html)
+
+
+class TestAttacksToTry(unittest.TestCase):
+    def test_clean_attack_names(self):
+        from nmapvuln.report import _attacks_for_port
+        names = _attacks_for_port(Port(portid=6379, state="open",
+                                       service=Service(name="redis", method="probed")))
+        self.assertIn("Brute force", names)
+        for n in names:
+            self.assertNotIn("\n", n)         # no payload blobs
+            self.assertLessEqual(len(n), 52)  # concise technique names only
+
+    def test_per_host_has_attacks_section(self):
+        from nmapvuln.report import write_html
+        a = Analysis()
+        a.scans.extend(parse_file(os.path.join(SAMPLES, "sample-scripts.xml")))
+        with tempfile.TemporaryDirectory() as tmp:
+            html = open(write_html(a, os.path.join(tmp, "r.html")), encoding="utf-8").read()
+        self.assertIn("Attacks to try", html)
+
+
 class TestUiControls(unittest.TestCase):
     def _html(self):
         analysis = Analysis()
